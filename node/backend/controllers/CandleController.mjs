@@ -7,6 +7,51 @@ class CandleController extends AppController {
     super(model)
   }
 
+  tickers = (req, res, next) => {
+    const symbols = [
+      'tBTCUSD',
+      'tETHUSD', 'tETHBTC',
+      'tXRPUSD', 'tXRPBTC',
+      'tLTCUSD', 'tLTCBTC',
+      'tIOTUSD', 'tIOTBTC', 'tIOTETH',
+      'tEOSUSD', 'tEOSBTC', 'tEOSETH',
+      'tDSHUSD', 'tDSHBTC',
+      'tXMRUSD', 'tXMRBTC',
+    ]
+    const domain = 'https://api-pub.bitfinex.com/v2/'
+    const path = 'tickers'
+    const params = '?symbols=' + symbols.join(',')
+    // const params = '?symbols=ALL'
+    const url = domain + path + params
+
+    axios.get(url)
+      .then(response => {
+        const tickers = response.data.filter(ticker => ticker.length <= 11).map(ticker => {
+          const data = {}
+          let skeleton = [
+            'SYMBOL', 'BID', 'BID_SIZE', 'ASK', 'ASK_SIZE', 'DAILY_CHANGE', 'DAILY_CHANGE_RELATIVE',
+            'LAST_PRICE', 'VOLUME', 'HIGH', 'LOW'
+          ]
+
+          skeleton.map((key, i) => data[key] = ticker[i])
+          return data
+        })
+
+        const compare = (a, b) => {
+          if (a.DAILY_CHANGE_RELATIVE < b.DAILY_CHANGE_RELATIVE) return 1
+          if (a.DAILY_CHANGE_RELATIVE > b.DAILY_CHANGE_RELATIVE) return -1
+
+          return 0
+        }
+
+        res.send(tickers.sort(compare))
+      })
+      .catch(e => {
+        res.status(500).send(e)
+        console.error(e)
+      })
+  }
+
   fetch = (req, res, next) => {
     const now = Date.now()
     const period = 134
