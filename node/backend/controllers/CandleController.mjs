@@ -2,10 +2,16 @@ import axios from 'axios'
 import indicators from 'technicalindicators'
 import AppController from './AppController.mjs'
 
+// TODO:
+//  Detect short term big gains or loss changes and hodl until the trend inverts
 class CandleController extends AppController {
   constructor(model) {
     super(model)
 
+    this.reset()
+  }
+
+  reset = () => {
     this.candles = []
     this.closes = []
     this.lastTrade = { position: 'buy', close: 7219.3 }
@@ -66,12 +72,19 @@ class CandleController extends AppController {
   }
 
   fetch = (req, res, next) => {
+    this.reset()
+
+    const query = req.query
+    const period = parseInt(query.period) || 7
+    const timeframe = ['5m', '15m', '30m', '1h'].includes(query.timeframe) ? query.timeframe : '5m'
+
     const now = Date.now()
-    const period = 7
     const startPeriod = now - (1000 * 60 * 60 * 24 * period)
+
     const domain = 'https://api-pub.bitfinex.com/v2/'
-    const path = 'candles/trade:5m:tBTCUSD/hist'
+    const path = 'candles/trade:' + timeframe + ':tBTCUSD/hist'
     const params = '?sort=1&limit=10000&start=' + startPeriod
+
     const url = domain + path + params
 
     axios.get(url)
@@ -83,7 +96,22 @@ class CandleController extends AppController {
               open: candle[1],
               close: candle[2],
               high: candle[3],
-              low: candle[4]
+              low: candle[4],
+              volume: candle[5],
+              macd: null,
+              rsi: null,
+              sma: null,
+              bullish: null,
+              bearish: null,
+              support_short: null,
+              support_long: null,
+              resistance_short: null,
+              resistance_long: null,
+              position: null,
+              gain_short: null,
+              gain_long: null,
+              loss_short: null,
+              loss_long: null
             }
           })
 
@@ -93,7 +121,11 @@ class CandleController extends AppController {
           this.mergeMacd()
           this.mergeRsi()
           this.mergeBullishBearish()
+          this.mergeLowests()
+          this.mergeHighests()
           this.calculatePositions()
+
+          const trades = this.candles.filter(candle => candle.position !== null)
 
           res.send({
             start: {
@@ -106,10 +138,10 @@ class CandleController extends AppController {
             },
             numbers: {
               candles: this.candles.length,
-              trades: this.candles.filter(candle => candle.position !== null).length,
+              trades: trades.length,
               closes: this.closes.length,
             },
-            trades: this.candles.filter(candle => candle.position !== null),
+            trades: trades,
             //candles: this.candles
           })
         } else {
@@ -117,8 +149,8 @@ class CandleController extends AppController {
         }
       })
       .catch(e => {
-        res.status(e.response.status).send(e)
-        console.error(e.response.status)
+        res.status(500).send(e)
+        console.error(e)
       })
   }
 
@@ -232,47 +264,202 @@ class CandleController extends AppController {
     }
   }
 
+  mergeLowests = () => {
+    const { Lowest } = indicators
+    const { inputShort, inputLong } = this.barriersInputs()
+
+    const short = Lowest.calculate(inputShort)
+    const long = Lowest.calculate(inputLong)
+
+    this.mergeBarriers('support', short, long)
+  }
+
+  mergeHighests = () => {
+    const { Highest, AverageGain, AverageLoss } = indicators
+    const { inputShort, inputLong } = this.barriersInputs()
+    const { inputShortAverage, inputLongAverage } = this.averagesInputs()
+
+    const short = Highest.calculate(inputShort)
+    const long = Highest.calculate(inputLong)
+
+    const short2 = AverageGain.calculate(inputShortAverage)
+    const long2 = AverageGain.calculate(inputLongAverage)
+
+    const short3 = AverageLoss.calculate(inputShortAverage)
+    const long3 = AverageLoss.calculate(inputLongAverage)
+
+    this.mergeBarriers('resistance', short, long)
+    this.mergeBarriers('gain', short2, long2)
+    this.mergeBarriers('loss', short3, long3)
+  }
+
+  barriersInputs = () => {
+    const closes = this.closes
+
+    return {
+      inputShort: {
+        values: closes,
+        period: 12 // 1h at 5 min per candle
+      },
+      inputLong: {
+        values: closes,
+        period: 12 * 24 // 24h at 5 min per candle
+      }
+    }
+  }
+
+  averagesInputs = () => {
+    const closes = this.closes
+
+    return {
+      inputShortAverage: {
+        values: closes,
+        period: 3 // 15 minutes at 5 minutes per candle
+      },
+      inputLongAverage: {
+        values: closes,
+        period: 12 // 1 at 5 minutes per candle
+      }
+    }
+  }
+
+  mergeBarriers = (prefix, short, long) => {
+    const keyShort = prefix + '_short'
+    const keyLong = prefix + '_long'
+    const differenceShort = this.candles.length - short.length
+    const differenceLong = this.candles.length - long.length
+
+    let cShort = 0
+    let cLong = 0
+    for (let i = 0; i < this.candles.length; i++) {
+      const candle = this.candles[i]
+
+      candle[keyShort] = null
+      candle[keyLong] = null
+
+      if (i >= differenceShort) {
+        candle[keyShort] = short[cShort]
+
+        cShort++
+      }
+
+      if (i >= differenceLong) {
+        candle[keyLong] = long[cLong]
+
+        cLong++
+      }
+    }
+  }
+
   calculatePositions = () => {
     for (let i = 0; i < this.candles.length; i++) {
       const candle = this.candles[i]
-      const lastTrade = this.lastTrade
 
-      candle.position = null
+      //candle.position = null
 
       if (this.hasEnoughData(candle)) {
-        if (
-          this.isBullish(candle) &&
-          this.brokeSupport(candle) &&
-          (typeof lastTrade.position === 'undefined' || lastTrade.position === 'sell') &&
-          this.hasLostEnough(candle)
-        ) {
-        //if (this.isBullish(candle) && candle.rsi <= 30 && (typeof lastTrade.position === 'undefined' || lastTrade.position === 'sell')) {
+        if (this.shouldBuy(candle)) {
           candle.position = 'buy'
-          console.log('BUY: ', this.thresholdDecrease, this.percentageDecrease(candle))
           this.lastTrade = candle
 
           this.btc = this.usd / candle.close
           this.usd = 0
-        } else if (
-          this.isBearish(candle) &&
-          this.brokeResistance(candle) &&
-          (typeof lastTrade.position === 'undefined' || lastTrade.position === 'buy') &&
-          this.hasGainedEnough(candle)
-        ) {
-        //} else if (this.isBearish(candle) && candle.rsi >= 70 && (typeof lastTrade.position === 'undefined' || lastTrade.position === 'buy')) {
+
+          console.log('\x1b[32m', '************** BUY **************')
+          console.log('Btc: ', this.btc)
+          console.log('Price: ', candle.close)
+          console.log(' ')
+        } else if (this.shouldSell(candle)) {
           candle.position = 'sell'
-          console.log('SELL: ', this.thresholdIncrease, this.percentageIncrease(candle))
           this.lastTrade = candle
 
           this.usd = candle.close * this.btc
           this.btc = 0
+
+          console.log('\x1b[33m', '************** SELL **************')
+          console.log('Price: ', candle.close)
+          console.log(' ')
         }
       }
     }
   }
 
   hasEnoughData = data => {
-    return (data.macd !== null && typeof data.macd.histogram !== 'undefined') && data.rsi !== null && data.bearish !== null && data.bullish !== null
+    return (data.macd !== null &&
+      typeof data.macd.histogram !== 'undefined') &&
+      data.rsi !== null &&
+      data.bearish !== null &&
+      data.bullish !== null &&
+      data.resistance_short !== null &&
+      data.resistance_long !== null &&
+      data.support_short !== null &&
+      data.support_long !== null
+  }
+
+  shouldBuy = data => {
+    const lastTrade = this.lastTrade
+
+    // Can't buy 2 times in a row
+    if (lastTrade.position === 'sell') {
+      const isNearShort = this.isNearBarrier('support_short', data)
+      const isNearLong = this.isNearBarrier('support_long', data)
+      const hasLostEnough = this.hasLostEnough(data)
+
+      if (this.isStableTrend(data)) {
+        if ((isNearShort || isNearLong) && hasLostEnough) {
+          return true
+        }
+      } else {
+        const isTrendingUp = data.gain_short > data.loss_short
+
+        if (!isTrendingUp) {
+          if (isNearLong && hasLostEnough) {
+            return true
+          }
+        }
+      }
+    }
+
+    return false
+  }
+
+  shouldSell = data => {
+    const lastTrade = this.lastTrade
+
+    // Can't sell 2 times in a row
+    if (lastTrade.position === 'buy') {
+      const isNearShort = this.isNearBarrier('resistance_short', data)
+      const isNearLong = this.isNearBarrier('resistance_long', data)
+      const hasGainedEnough = this.hasGainedEnough(data)
+
+      if (this.isStableTrend(data)) {
+        if ((isNearShort || isNearLong) && hasGainedEnough) {
+          return true
+        }
+      } else {
+        const isTrendingUp = data.gain_short > data.loss_short
+
+        if (!isTrendingUp) {
+           if (isNearLong && hasGainedEnough) {
+             return true
+           }
+        }
+      }
+    }
+
+    return false
+  }
+
+  isStableTrend = data => {
+    return this.percentageDifference(data.gain_short, data.loss_short) <= 0.5
+  }
+
+  percentageDifference = (n1, n2) => {
+    return ((n1 - n2) / ((n1 + n2) / 2)) * 100
+  }
+
+  isNearBarrier = (key, data) => {
+    return this.percentageDifference(data.close, data[key]) <= 0.5
   }
 
   hasGainedEnough = data => {
@@ -282,12 +469,13 @@ class CandleController extends AppController {
       this.thresholdIncrease = 2.5
       return true
     }
+
     const isWithinThreshold = percentage >= this.thresholdIncrease
 
     if (isWithinThreshold) {
       this.thresholdIncrease = 2.5
     } else {
-      this.thresholdIncrease -= 0.01
+      this.thresholdIncrease -= 0.05
     }
 
     return isWithinThreshold
@@ -306,9 +494,10 @@ class CandleController extends AppController {
     if (isWithinThreshold) {
       this.thresholdDecrease = 2.5
     } else {
-      this.thresholdDecrease -= 0.01
+      this.thresholdDecrease -= 0.05
     }
-    console.log(this.hoursBetween(this.lastTrade.date, data.date))
+
+    // console.log(this.hoursBetween(this.lastTrade.date, data.date))
 
     return isWithinThreshold
   }
@@ -325,20 +514,28 @@ class CandleController extends AppController {
     return ((this.lastTrade.close - data.close) / this.lastTrade.close) * 100
   }
 
-  brokeResistance = data => {
-    return data.sma <= data.low
+  isTrendingUp = data => {
+    return data.sma <= data.close
   }
 
-  brokeSupport = data => {
-    return data.sma >= data.high
+  isTrendingDown = data => {
+    return data.sma >= data.open
   }
 
   isBullish = data => {
-    return data.bullish && !data.bearish
+    return data.bullish && !data.bearish //&& data.close >= data.open
   }
 
   isBearish = data => {
-    return data.bearish && !data.bullish
+    return data.bearish && !data.bullish //&& data.close <= data.open
+  }
+
+  isMacdBuyPosition = data => {
+    return data.macd.MACD <= data.macd.signal
+  }
+
+  isMacdSellPosition = data => {
+    return data.macd.signal >= data.macd.MACD
   }
 }
 
