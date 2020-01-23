@@ -451,7 +451,9 @@ class CandleController extends AppController {
   }
 
   isStableTrend = data => {
-    return this.percentageDifference(data.gain_short, data.loss_short) <= 0.5
+    const difference = this.percentageDifference(data.gain_long, data.loss_long)
+
+    return  difference <= 0.05 && difference >= -0.05
   }
 
   percentageDifference = (n1, n2) => {
