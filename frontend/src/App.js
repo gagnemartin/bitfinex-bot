@@ -7,7 +7,7 @@ import Routes from './routes'
 class App extends PureComponent {
   state = {
     candles: [],
-    macd: []
+    trades: []
   }
 
   componentDidMount() {
@@ -16,17 +16,25 @@ class App extends PureComponent {
   }
 
   fetchCandles = () => {
-    axios.get(Routes.candles.fetch + '?period=7')
+    axios.get(Routes.candles.fetch + '?period=14&ticker=tBTCUSD')
       .then(res => {
-        let candles = res.data.candles.map(candle => {
-          return [
-            new Date(candle.date),
-            candle.close,
-            candle.position
-          ]
-        })
+        const data = res.data
 
-        this.setState({ candles })
+        if (typeof data !== 'undefined' && typeof data.candles !== 'undefined' && data.trades !== 'undefined') {
+          const candles = data.candles.map(candle => {
+            return [
+              new Date(candle.date),
+              candle.close,
+              candle.position,
+              '<pre><code>' + JSON.stringify(candle, null, 2) + '</code></pre>'
+            ]
+          })
+  
+          const trades = data.trades
+  
+          this.setState({ candles, trades })
+        }
+        
       })
       .catch(e => {
         console.error(e)
@@ -66,26 +74,67 @@ class App extends PureComponent {
       console.log(response)
     }
   }
+
+  claculateStartEnd = () => {
+    const trades = this.state.trades
+    const data = {
+      start: { btc: 0.01315, usd: 0.19332 },
+      end: { btc: 0.01315, usd: 0.19332 }
+    }
+
+    if (trades.length > 0) {
+      for (let i = 0; i < trades.length; i++) {
+        const trade = trades[i]
+
+        if (trade.position === 'sell') {
+          data.end.usd = trade.close * data.end.btc
+          data.end.btc = 0
+        } else {
+          data.end.btc = data.end.usd / trade.close
+          data.end.usd = 0
+        }
+      }
+    }
+
+    return data
+  }
+
   render() {
     const { candles } = this.state
+    const { start, end } = this.claculateStartEnd()
+    const difference = end.btc - start.btc
+    const differencePercentage = ((end.btc - start.btc) / start.btc) * 100
 
     return (
       <div className="App">
+        <p>
+          Start: {start.btc} <br/>
+          End: {end.btc} <br/>
+          { (differencePercentage > 0 ? '+' : '') }{differencePercentage.toFixed(2)}% ({ (difference > 0 ? '+' : '') }{difference})
+        </p>
         {candles && candles.length > 0 &&
         <Chart
           width="100%"
-          height={600}
+          height={1000}
           chartType="LineChart"
           loader={<div>Loading Chart</div>}
           rows={candles}
           columns={[
             { type: 'date', label: 'Date' },
             { type: 'number', label: 'Close' },
-            { role: 'annotation' }
+            { role: 'annotation' },
+            { role: 'tooltip', 'p': {'html': true} }
           ]}
           options={{
+            tooltip: {isHtml: true},
             legend: 'none',
-            explorer: { axis: 'horizontal', keepInBounds: true, zoomDelta: 1.1, maxZoomIn: 0.001, actions: [ 'dragToZoom', 'rightClickToReset' ] }
+            explorer: {
+              axis: 'horizontal',
+              keepInBounds: true,
+              zoomDelta: 1.1,
+              maxZoomIn: 0.08,
+              actions: ['dragToZoom']
+            }
           }}
           rootProps={{ 'data-testid': '1' }}
         />

@@ -40,3 +40,8 @@
 svg.react-stockchart {
   position: static !important;
 }
+
+div.google-visualization-tooltip {
+  text-align: left;
+  padding: 0 10px;
+}
