@@ -1,5 +1,6 @@
 import axios from 'axios'
 import indicators from 'technicalindicators'
+import WebSocket from 'ws'
 import AppController from './AppController.mjs'
 
 // TODO:
@@ -9,6 +10,7 @@ class CandleController extends AppController {
     super(model)
 
     this.reset()
+    this.openSocket()
   }
 
   reset = () => {
@@ -35,6 +37,29 @@ class CandleController extends AppController {
     }
 
     return threshold
+  }
+
+  openSocket = () => {
+    const ws = new WebSocket('wss://api-pub.bitfinex.com/ws/2')
+
+    ws.on('message', msg => {
+      const response = JSON.parse(msg)
+
+      if (response instanceof Array && response[1] !== "hb") {
+        response[1][0] = new Date(response[1][0]).toString()
+      }
+      
+      console.log('*********************************')
+      console.log(response)
+    })
+
+    const msg = JSON.stringify({ 
+      event: 'subscribe', 
+      channel: 'candles', 
+      key: 'trade:5m:tBTCUSD' //'trade:TIMEFRAME:SYMBOL'
+    })
+
+    ws.on('open', () => ws.send(msg))
   }
 
   tickers = (req, res, next) => {
