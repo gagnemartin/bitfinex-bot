@@ -15,8 +15,8 @@ class CandleController extends AppController {
     this.candles = []
     this.closes = []
     this.lastTrade = { position: 'buy', close: 7219.3 }
-    this.thresholdIncrease = 2.5
-    this.thresholdDecrease = 2.5
+    this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
+    this.thresholdDecrease = this.resetThreshold('thresholdDecrease')
 
     //this.startBtc = 1
     this.startBtc = 0.01315
@@ -24,6 +24,16 @@ class CandleController extends AppController {
     this.startUsd = 0.19332
     this.btc = this.startBtc
     this.usd = this.startUsd
+  }
+  resetThreshold = key => {
+    let threshold = 2.5
+
+    // Change if we want to have a different threshold for decreases
+    if (key === 'thresholdDecrease') {
+      threshold = 2.5
+    }
+
+    return threshold
   }
 
   tickers = (req, res, next) => {
@@ -404,20 +414,30 @@ class CandleController extends AppController {
       const isNearShort = this.isNearBarrier('support_short', data)
       const isNearLong = this.isNearBarrier('support_long', data)
       const hasLostEnough = this.hasLostEnough(data)
+      const isTrendingUp = (data.gain_short > data.loss_short) && lastTrade.close < data.close
 
-      if (this.isStableTrend(data)) {
-        if ((isNearShort || isNearLong) && hasLostEnough) {
+      if (isTrendingUp) {
+        if (data.gain_short < data.loss_short && hasLostEnough) {
           return true
         }
       } else {
-        const isTrendingUp = data.gain_short > data.loss_short
-
-        if (!isTrendingUp) {
-          if (isNearLong && hasLostEnough) {
-            return true
-          }
+        if (data.gain_long < data.loss_long && hasLostEnough) {
+          return true
         }
       }
+
+      // if (this.isStableTrend(data)) {
+      //   if ((isNearShort || isNearLong) && hasLostEnough) {
+      //     console.log('HRE')
+      //     return true
+      //   }
+      // } else {
+        // if (!isTrendingUp) {
+        //   if (isNearLong && hasLostEnough) {
+        //     return true
+        //   }
+        // }
+      // }
     }
 
     return false
@@ -428,23 +448,36 @@ class CandleController extends AppController {
 
     // Can't sell 2 times in a row
     if (lastTrade.position === 'buy') {
+      // If trending up (gain long > loss long)
+        // HODL till long loss
+      // Else (trending down -> gain long < loss long)
+        // Sell on short gain
       const isNearShort = this.isNearBarrier('resistance_short', data)
       const isNearLong = this.isNearBarrier('resistance_long', data)
       const hasGainedEnough = this.hasGainedEnough(data)
+      const isTrendingUp = (data.gain_short > data.loss_short) && lastTrade.close < data.close
 
-      if (this.isStableTrend(data)) {
-        if ((isNearShort || isNearLong) && hasGainedEnough) {
+      if (isTrendingUp) {
+        if (data.gain_long > data.loss_long && hasGainedEnough) {
           return true
         }
       } else {
-        const isTrendingUp = data.gain_short > data.loss_short
-
-        if (!isTrendingUp) {
-           if (isNearLong && hasGainedEnough) {
-             return true
-           }
+        if (data.gain_short > data.loss_short && hasGainedEnough) {
+          return true
         }
       }
+
+      // if (this.isStableTrend(data)) {
+      //   if ((isNearShort || isNearLong) && hasGainedEnough) {
+      //     return true
+      //   }
+      // } else {
+        // if (!isTrendingUp) {
+        //    if (isNearLong && hasGainedEnough) {
+        //      return true
+        //    }
+        // }
+      // }
     }
 
     return false
@@ -468,14 +501,14 @@ class CandleController extends AppController {
     const percentage = this.percentageIncrease(data)
 
     if (percentage <= -3 && this.hoursBetween(this.lastTrade.date, data.date) >= 1) {
-      this.thresholdIncrease = 2.5
+      this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
       return true
     }
 
     const isWithinThreshold = percentage >= this.thresholdIncrease
 
     if (isWithinThreshold) {
-      this.thresholdIncrease = 2.5
+      this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
     } else {
       this.thresholdIncrease -= 0.05
     }
@@ -487,14 +520,14 @@ class CandleController extends AppController {
     const percentage = this.percentageDecrease(data)
 
     if (percentage <= -1 && this.hoursBetween(this.lastTrade.date, data.date) >= 1) {
-      this.thresholdDecrease = 2.5
+      this.thresholdDecrease = this.resetThreshold('thresholdDecrease')
       return true
     }
 
     const isWithinThreshold = percentage >= this.thresholdDecrease
 
     if (isWithinThreshold) {
-      this.thresholdDecrease = 2.5
+      this.thresholdDecrease = this.resetThreshold('thresholdDecrease')
     } else {
       this.thresholdDecrease -= 0.05
     }
