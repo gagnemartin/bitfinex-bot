@@ -25,6 +25,7 @@ class CandleController extends AppController {
     this.btc = this.startBtc
     this.usd = this.startUsd
   }
+  
   resetThreshold = key => {
     let threshold = 2.5
 
@@ -83,16 +84,18 @@ class CandleController extends AppController {
 
   fetch = (req, res, next) => {
     this.reset()
+    console.log(process.env.TEST)
 
     const query = req.query
     const period = parseInt(query.period) || 7
     const timeframe = ['5m', '15m', '30m', '1h'].includes(query.timeframe) ? query.timeframe : '5m'
+    const ticker = query.ticker || 'tBTCUSD'
 
     const now = Date.now()
     const startPeriod = now - (1000 * 60 * 60 * 24 * period)
 
     const domain = 'https://api-pub.bitfinex.com/v2/'
-    const path = 'candles/trade:' + timeframe + ':tBTCUSD/hist'
+    const path = 'candles/trade:' + timeframe + ':' + ticker + '/hist'
     const params = '?sort=1&limit=10000&start=' + startPeriod
 
     const url = domain + path + params
@@ -324,11 +327,11 @@ class CandleController extends AppController {
     return {
       inputShortAverage: {
         values: closes,
-        period: 3 // 15 minutes at 5 minutes per candle
+        period: 3 // 30 minutes at 5 minutes per candle
       },
       inputLongAverage: {
         values: closes,
-        period: 12 // 1 at 5 minutes per candle
+        period: 12 // 1 hour at 5 minutes per candle
       }
     }
   }
@@ -365,8 +368,6 @@ class CandleController extends AppController {
     for (let i = 0; i < this.candles.length; i++) {
       const candle = this.candles[i]
 
-      //candle.position = null
-
       if (this.hasEnoughData(candle)) {
         if (this.shouldBuy(candle)) {
           candle.position = 'buy'
@@ -375,10 +376,10 @@ class CandleController extends AppController {
           this.btc = this.usd / candle.close
           this.usd = 0
 
-          console.log('\x1b[32m', '************** BUY **************')
-          console.log('Btc: ', this.btc)
-          console.log('Price: ', candle.close)
-          console.log(' ')
+          // console.log('\x1b[32m', '************** BUY **************')
+          // console.log('Btc: ', this.btc)
+          // console.log('Price: ', candle.close)
+          // console.log(' ')
         } else if (this.shouldSell(candle)) {
           candle.position = 'sell'
           this.lastTrade = candle
@@ -386,9 +387,9 @@ class CandleController extends AppController {
           this.usd = candle.close * this.btc
           this.btc = 0
 
-          console.log('\x1b[33m', '************** SELL **************')
-          console.log('Price: ', candle.close)
-          console.log(' ')
+          // console.log('\x1b[33m', '************** SELL **************')
+          // console.log('Price: ', candle.close)
+          // console.log(' ')
         }
       }
     }
@@ -413,8 +414,8 @@ class CandleController extends AppController {
     if (lastTrade.position === 'sell') {
       const isNearShort = this.isNearBarrier('support_short', data)
       const isNearLong = this.isNearBarrier('support_long', data)
-      const hasLostEnough = this.hasLostEnough(data)
-      const isTrendingUp = (data.gain_short > data.loss_short) && lastTrade.close < data.close
+      const isTrendingUp = this.isTrendingUp(data)
+      const hasLostEnough = this.hasLostEnough(data, isTrendingUp)
 
       if (isTrendingUp) {
         if (data.gain_short < data.loss_short && hasLostEnough) {
@@ -454,8 +455,9 @@ class CandleController extends AppController {
         // Sell on short gain
       const isNearShort = this.isNearBarrier('resistance_short', data)
       const isNearLong = this.isNearBarrier('resistance_long', data)
-      const hasGainedEnough = this.hasGainedEnough(data)
-      const isTrendingUp = (data.gain_short > data.loss_short) && lastTrade.close < data.close
+      const isTrendingUp = this.isTrendingUp(data)
+      const hasGainedEnough = this.hasGainedEnough(data, isTrendingUp)
+      const percentageIncrease = this.percentageIncrease(data)
 
       if (isTrendingUp) {
         if (data.gain_long > data.loss_long && hasGainedEnough) {
@@ -482,6 +484,12 @@ class CandleController extends AppController {
 
     return false
   }
+  
+  isTrendingUp = data => {
+    const lastTrade = this.lastTrade
+
+    return (data.gain_short > data.loss_short) && data.close > lastTrade.close
+  }
 
   isStableTrend = data => {
     const difference = this.percentageDifference(data.gain_long, data.loss_long)
@@ -497,10 +505,16 @@ class CandleController extends AppController {
     return this.percentageDifference(data.close, data[key]) <= 0.5
   }
 
-  hasGainedEnough = data => {
+  /*
+   * Detect if the coin has gained enough before selling
+   * If the price drops
+   */
+  hasGainedEnough = (data, isTrendingUp) => {
     const percentage = this.percentageIncrease(data)
+    const percentageThreshold = isTrendingUp ? -1 : -3
+    const hoursBetweenThreshold = isTrendingUp ? 3 : 1
 
-    if (percentage <= -3 && this.hoursBetween(this.lastTrade.date, data.date) >= 1) {
+    if (percentage <= percentageThreshold && this.hoursBetween(this.lastTrade.date, data.date) >= hoursBetweenThreshold) {
       this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
       return true
     }
@@ -516,10 +530,12 @@ class CandleController extends AppController {
     return isWithinThreshold
   }
 
-  hasLostEnough = data => {
+  hasLostEnough = (data, isTrendingUp) => {
     const percentage = this.percentageDecrease(data)
+    const percentageThreshold = isTrendingUp ? -3 : -1
+    const hoursBetweenThreshold = isTrendingUp ? 1 : 3
 
-    if (percentage <= -1 && this.hoursBetween(this.lastTrade.date, data.date) >= 1) {
+    if (percentage <= percentageThreshold && this.hoursBetween(this.lastTrade.date, data.date) >= hoursBetweenThreshold) {
       this.thresholdDecrease = this.resetThreshold('thresholdDecrease')
       return true
     }
@@ -549,13 +565,13 @@ class CandleController extends AppController {
     return ((this.lastTrade.close - data.close) / this.lastTrade.close) * 100
   }
 
-  isTrendingUp = data => {
-    return data.sma <= data.close
-  }
+  // isTrendingUp = data => {
+  //   return data.sma <= data.close
+  // }
 
-  isTrendingDown = data => {
-    return data.sma >= data.open
-  }
+  // isTrendingDown = data => {
+  //   return data.sma >= data.open
+  // }
 
   isBullish = data => {
     return data.bullish && !data.bearish //&& data.close >= data.open
