@@ -1,15 +1,16 @@
 import React, { PureComponent } from 'react'
-import logo from './logo.svg'
+// import logo from './logo.svg'
 import './App.css'
-import crypto from 'crypto-js'
+// import crypto from 'crypto-js'
 import axios from 'axios'
-import { ChartCanvas, Chart } from "react-stockcharts"
-import { CandlestickSeries, MACDSeries } from "react-stockcharts/lib/series"
-import { XAxis, YAxis } from "react-stockcharts/lib/axes"
-import { discontinuousTimeScaleProvider } from "react-stockcharts/lib/scale"
-import { fitWidth } from "react-stockcharts/lib/helper"
-import { last } from "react-stockcharts/lib/utils"
-import { macd } from "react-stockcharts/lib/indicator"
+import Chart from 'react-google-charts'
+// import { ChartCanvas, Chart } from "react-stockcharts"
+// import { CandlestickSeries, MACDSeries } from "react-stockcharts/lib/series"
+// import { XAxis, YAxis } from "react-stockcharts/lib/axes"
+// import { discontinuousTimeScaleProvider } from "react-stockcharts/lib/scale"
+// import { fitWidth } from "react-stockcharts/lib/helper"
+// import { last } from "react-stockcharts/lib/utils"
+// import { macd } from "react-stockcharts/lib/indicator"
 
 class App extends PureComponent {
   state = {
@@ -23,22 +24,11 @@ class App extends PureComponent {
   }
 
   fetchCandles = () => {
-
-    const url = '/candles'
+    const url = 'http://localhost:4000/api/v1/candles/fetch'
 
     axios.get(url)
       .then(res => {
-        for (let i = 0; i < res.data.candles.length; i++) {
-          res.data.candles[i].date = new Date(res.data.candles[i].date)
-        }
-
-        console.log(res.data.rsi)
-
-        this.setState({
-          candles: res.data.candles,
-          macd: res.data.macd,
-          rsi: res.data.rsi
-        })
+        console.log(res)
       })
       .catch(e => {
         console.error(e)
@@ -80,74 +70,15 @@ class App extends PureComponent {
   }
   render() {
     const { candles } = this.state
-    const macdAppearance = {
-      stroke: {
-        macd: "#FF0000",
-        signal: "#00F300",
-      },
-      fill: {
-        divergence: "#4682B4"
-      },
-    }
-
-    const xScaleProvider = discontinuousTimeScaleProvider
-      .inputDateAccessor(d => d.date);
-    const {
-      data,
-      xScale,
-      xAccessor,
-      displayXAccessor,
-    } = xScaleProvider(candles);
-    const xExtents = [
-      xAccessor(last(data)),
-      xAccessor(data[data.length - 100])
-    ]
-
-    const macdCalculator = macd()
-      .options({
-        fast: 12,
-        slow: 26,
-        signal: 9,
-      })
-      .merge((d, c) => {d.macd = c;})
-      .accessor(d => d.macd);
-    console.log(candles)
 
     return (
       <div className="App">
         {candles && candles.length > 0 &&
-        <ChartCanvas
-          height={500}
-          ratio={1}
-          width={this.props.width}
-          //margin={{ left: 50, right: 50, top: 10, bottom: 30 }}
-          type="svg"
-          seriesName="MSFT"
-          data={data}
-          xScale={xScale}
-          xAccessor={xAccessor}
-          displayXAccessor={displayXAccessor}
-          xExtents={xExtents}
-        >
-          <Chart id={1} yExtents={d => [d.high, d.low]}>
-            <XAxis axisAt="bottom" orient="bottom" ticks={6}/>
-            <YAxis axisAt="right" orient="right" ticks={5} />
-            <CandlestickSeries />
-          </Chart>
-
-          <Chart id={3} height={150}
-                 yExtents={macdCalculator.accessor()}
-                 origin={(w, h) => [0, h - 150]} padding={{ top: 10, bottom: 10 }}>
-            {/*<XAxis axisAt="bottom" orient="bottom" ticks={6}/>*/}
-            {/*<YAxis axisAt="right" orient="right" ticks={5} />*/}
-            <MACDSeries yAccessor={d => d.macd} {...macdAppearance} />
-          </Chart>
-        </ChartCanvas>
+        <p>hello</p>
         }
       </div>
     );
   }
 }
 
-App = fitWidth(App)
-export default App;
+export default App
