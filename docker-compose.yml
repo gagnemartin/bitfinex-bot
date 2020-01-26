@@ -5,6 +5,8 @@ services:
     build:
       context: ./backend/
       dockerfile: Dockerfile.dev
+    env_file:
+      - ./backend/dev.env
     volumes:
       - ./backend/:/usr/src/app/
       - /usr/src/app/node_modules
