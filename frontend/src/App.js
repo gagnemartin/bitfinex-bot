@@ -1,16 +1,8 @@
 import React, { PureComponent } from 'react'
-// import logo from './logo.svg'
 import './App.css'
-// import crypto from 'crypto-js'
 import axios from 'axios'
 import Chart from 'react-google-charts'
-// import { ChartCanvas, Chart } from "react-stockcharts"
-// import { CandlestickSeries, MACDSeries } from "react-stockcharts/lib/series"
-// import { XAxis, YAxis } from "react-stockcharts/lib/axes"
-// import { discontinuousTimeScaleProvider } from "react-stockcharts/lib/scale"
-// import { fitWidth } from "react-stockcharts/lib/helper"
-// import { last } from "react-stockcharts/lib/utils"
-// import { macd } from "react-stockcharts/lib/indicator"
+import Routes from './routes'
 
 class App extends PureComponent {
   state = {
@@ -24,9 +16,7 @@ class App extends PureComponent {
   }
 
   fetchCandles = () => {
-    const url = 'http://localhost:4000/api/v1/candles/fetch'
-
-    axios.get(url)
+    axios.get(Routes.candles.fetch)
       .then(res => {
         console.log(res)
       })
