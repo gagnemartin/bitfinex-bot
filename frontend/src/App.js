@@ -16,9 +16,17 @@ class App extends PureComponent {
   }
 
   fetchCandles = () => {
-    axios.get(Routes.candles.fetch)
+    axios.get(Routes.candles.fetch + '?period=7')
       .then(res => {
-        console.log(res)
+        let candles = res.data.candles.map(candle => {
+          return [
+            new Date(candle.date),
+            candle.close,
+            candle.position
+          ]
+        })
+
+        this.setState({ candles })
       })
       .catch(e => {
         console.error(e)
@@ -64,7 +72,23 @@ class App extends PureComponent {
     return (
       <div className="App">
         {candles && candles.length > 0 &&
-        <p>hello</p>
+        <Chart
+          width="100%"
+          height={600}
+          chartType="LineChart"
+          loader={<div>Loading Chart</div>}
+          rows={candles}
+          columns={[
+            { type: 'date', label: 'Date' },
+            { type: 'number', label: 'Close' },
+            { role: 'annotation' }
+          ]}
+          options={{
+            legend: 'none',
+            explorer: { axis: 'horizontal', keepInBounds: true, zoomDelta: 1.1, maxZoomIn: 0.001, actions: [ 'dragToZoom', 'rightClickToReset' ] }
+          }}
+          rootProps={{ 'data-testid': '1' }}
+        />
         }
       </div>
     );

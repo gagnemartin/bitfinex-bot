@@ -152,7 +152,7 @@ class CandleController extends AppController {
               closes: this.closes.length,
             },
             trades: trades,
-            //candles: this.candles
+            candles: this.candles
           })
         } else {
           res.status(500).send('Error')
