@@ -41,40 +41,6 @@ class App extends PureComponent {
       })
   }
 
-  openSocket = () => {
-    const apiKey = 'xxx' // Users API credentials are defined here
-    const apiSecret = 'xxx'
-
-    const authNonce = Date.now() * 1000 // Generate an ever increasing, single use value. (a timestamp satisfies this criteria)
-    const authPayload = 'AUTH' + authNonce // Compile the authentication payload, this is simply the string 'AUTH' prepended to the nonce value
-    const authSig = crypto.HmacSHA384(authPayload, apiSecret).toString(crypto.enc.Hex) // The authentication payload is hashed using the private key, the resulting hash is output as a hexadecimal string
-
-    const payload = {
-      apiKey, //API key
-      authSig, //Authentication Sig
-      authNonce,
-      authPayload,
-      event: 'auth', // The connection event, will always equal 'auth'
-    }
-
-    const wss = new WebSocket('wss://api.bitfinex.com/ws/2') // Create new Websocket
-
-    wss.onopen = () => {
-      console.log("connected websocket main component")
-
-      wss.send(JSON.stringify(payload))
-    }
-
-    wss.onerror = (e) => {
-      console.error(e)
-    }
-
-    wss.onmessage = (res) => {
-      let response = JSON.parse(res.data)
-      console.log(response)
-    }
-  }
-
   claculateStartEnd = () => {
     const trades = this.state.trades
     const data = {
@@ -99,20 +65,48 @@ class App extends PureComponent {
     return data
   }
 
+  isNotLoss = (position, close, lastClose) => {
+    if (position === 'sell') {
+      return true
+    }
+
+    return close < lastClose
+  }
+
   render() {
-    const { candles } = this.state
+    const { candles, trades } = this.state
     const { start, end } = this.claculateStartEnd()
-    const difference = end.btc - start.btc
-    const differencePercentage = ((end.btc - start.btc) / start.btc) * 100
+    const differenceBtc = end.btc - start.btc
+    const differencePercentageBtc = ((end.btc - start.btc) / start.btc) * 100
+
+    const differenceUsd = end.usd - start.usd
+    const differencePercentageUsd = ((end.usd - start.usd) / start.usd) * 100
 
     return (
       <div className="App">
-        <p>
-          Start: {start.btc} <br/>
-          End: {end.btc} <br/>
-          { (differencePercentage > 0 ? '+' : '') }{differencePercentage.toFixed(2)}% ({ (difference > 0 ? '+' : '') }{difference})
-        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto auto' }}>
+          <div>
+            <h2>BTC</h2>
+            <p> 
+              Start: {start.btc} <br/>
+              End: {end.btc} <br/>
+              { (differencePercentageBtc > 0 ? '+' : '') }{differencePercentageBtc.toFixed(2)}% ({ (differenceBtc > 0 ? '+' : '') }{differenceBtc})
+            </p>
+          </div>
+
+          <div>
+            <h2>USD</h2>
+            <p> 
+              Start: {start.usd} <br/>
+              End: {end.usd} <br/>
+              { (differencePercentageUsd > 0 ? '+' : '') }{differencePercentageUsd.toFixed(2)}% ({ (differenceUsd > 0 ? '+' : '') }{differenceUsd})
+            </p>
+          </div>
+        </div>
+        
+        
         {candles && candles.length > 0 &&
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto auto' }}>
         <Chart
           width="100%"
           height={1000}
@@ -133,11 +127,23 @@ class App extends PureComponent {
               keepInBounds: true,
               zoomDelta: 1.1,
               maxZoomIn: 0.08,
-              actions: ['dragToZoom']
+              actions: ['dragToZoom', 'rightClickToReset']
             }
           }}
           rootProps={{ 'data-testid': '1' }}
         />
+
+          <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+          <ul className="list-group list-group-flush">
+            {trades.reverse().map((trade, i) => (
+              <li className={"list-group-item " + (( (i + 1) < trades.length && this.isNotLoss(trade.position, trade.close, trades[i + 1].close)) ? '' : 'list-group-item-danger')} key={trade.close}>
+                {trade.position.toUpperCase()} <br/>
+                {trade.close}
+              </li>
+            ))}
+          </ul>
+          </div>
+        </div>
         }
       </div>
     );
