@@ -10,7 +10,7 @@ class CandleController extends AppController {
     super(model)
 
     this.reset()
-    this.openSocket()
+    // this.openSocket()
   }
 
   reset = () => {
@@ -394,7 +394,7 @@ class CandleController extends AppController {
       const candle = this.candles[i]
 
       if (this.hasEnoughData(candle)) {
-        if (this.shouldBuy(candle)) {
+        if (this.shouldBuy(candle, i)) {
           candle.position = 'buy'
           this.lastTrade = candle
 
@@ -405,7 +405,7 @@ class CandleController extends AppController {
           // console.log('Btc: ', this.btc)
           // console.log('Price: ', candle.close)
           // console.log(' ')
-        } else if (this.shouldSell(candle)) {
+        } else if (this.shouldSell(candle, i)) {
           candle.position = 'sell'
           this.lastTrade = candle
 
@@ -432,7 +432,7 @@ class CandleController extends AppController {
       data.support_long !== null
   }
 
-  shouldBuy = data => {
+  shouldBuy = (data, i) => {
     const lastTrade = this.lastTrade
 
     // Can't buy 2 times in a row
@@ -445,10 +445,22 @@ class CandleController extends AppController {
       if (isTrendingUp) {
         if (data.gain_short < data.loss_short && hasLostEnough) {
           return true
+        } else {
+          this.candles[i].reason = {
+            isTrendingUp: isTrendingUp,
+            short_loss_higher: data.gain_short < data.loss_short,
+            hasLostEnough: hasLostEnough
+          }
         }
       } else {
         if (data.gain_long < data.loss_long && hasLostEnough) {
           return true
+        } else {
+          this.candles[i].reason = {
+            isTrendingUp: isTrendingUp,
+            long_loss_higher: data.gain_long < data.loss_long,
+            hasLostEnough: hasLostEnough
+          }
         }
       }
 
@@ -469,7 +481,7 @@ class CandleController extends AppController {
     return false
   }
 
-  shouldSell = data => {
+  shouldSell = (data, i) => {
     const lastTrade = this.lastTrade
 
     // Can't sell 2 times in a row
@@ -487,10 +499,22 @@ class CandleController extends AppController {
       if (isTrendingUp) {
         if (data.gain_long > data.loss_long && hasGainedEnough) {
           return true
+        } else {
+          this.candles[i].reason = {
+            isTrendingUp: isTrendingUp,
+            short_gain_higher: data.gain_long > data.loss_long ,
+            hasGainedEnough: hasGainedEnough
+          }
         }
       } else {
         if (data.gain_short > data.loss_short && hasGainedEnough) {
           return true
+        } else {
+          this.candles[i].reason = {
+            isTrendingUp: isTrendingUp,
+            short_gain_higher: data.gain_short > data.loss_short ,
+            hasGainedEnough: hasGainedEnough
+          }
         }
       }
 
@@ -537,7 +561,8 @@ class CandleController extends AppController {
   hasGainedEnough = (data, isTrendingUp) => {
     const percentage = this.percentageIncrease(data)
     const percentageThreshold = isTrendingUp ? -1 : -3
-    const hoursBetweenThreshold = isTrendingUp ? 3 : 1
+    const hoursBetweenThreshold = isTrendingUp ? 3 : 0.3
+    const increaseThreshold = isTrendingUp ? 0.005 : 0.05
 
     if (percentage <= percentageThreshold && this.hoursBetween(this.lastTrade.date, data.date) >= hoursBetweenThreshold) {
       this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
@@ -549,7 +574,7 @@ class CandleController extends AppController {
     if (isWithinThreshold) {
       this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
     } else {
-      this.thresholdIncrease -= 0.05
+      this.thresholdIncrease -= increaseThreshold
     }
 
     return isWithinThreshold
@@ -558,7 +583,8 @@ class CandleController extends AppController {
   hasLostEnough = (data, isTrendingUp) => {
     const percentage = this.percentageDecrease(data)
     const percentageThreshold = isTrendingUp ? -3 : -1
-    const hoursBetweenThreshold = isTrendingUp ? 1 : 3
+    const hoursBetweenThreshold = isTrendingUp ? 0.3 : 5
+    const decreaseThreshold = isTrendingUp ? 0.3 : 0.05
 
     if (percentage <= percentageThreshold && this.hoursBetween(this.lastTrade.date, data.date) >= hoursBetweenThreshold) {
       this.thresholdDecrease = this.resetThreshold('thresholdDecrease')
@@ -570,7 +596,7 @@ class CandleController extends AppController {
     if (isWithinThreshold) {
       this.thresholdDecrease = this.resetThreshold('thresholdDecrease')
     } else {
-      this.thresholdDecrease -= 0.05
+      this.thresholdDecrease -= decreaseThreshold
     }
 
     // console.log(this.hoursBetween(this.lastTrade.date, data.date))
