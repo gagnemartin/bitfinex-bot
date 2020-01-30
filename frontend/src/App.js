@@ -1,8 +1,9 @@
 import React, { PureComponent } from 'react'
-import './App.css'
 import axios from 'axios'
 import Chart from 'react-google-charts'
 import Routes from './routes'
+
+import './App.css'
 
 class App extends PureComponent {
   state = {
@@ -11,12 +12,38 @@ class App extends PureComponent {
   }
 
   componentDidMount() {
-    this.fetchCandles()
-    //this.openSocket()
+    //this.fetchCandles()
+    this.openSocket()
+  }
+
+  openSocket = () => {
+    const ws = new WebSocket(Routes.candles.socket.replace('http', 'ws').replace('4000', '8080'))
+
+    ws.addEventListener('open', () => {
+      ws.addEventListener('message', res => {
+        const event = JSON.parse(res.data)
+        console.log(event.data)
+        
+        if (event.eventName === 'init') {
+          const candles = event.data.candles.map(candle => {
+            return [
+              new Date(candle.date),
+              candle.close,
+              candle.position,
+              '<pre><code>' + JSON.stringify(candle, null, 2) + '</code></pre>'
+            ]
+          })
+
+          const trades = event.data.trades
+
+          this.setState({candles, trades})
+        }
+      })
+    })
   }
 
   fetchCandles = () => {
-    axios.get(Routes.candles.fetch + '?period=14&ticker=tBTCUSD')
+    axios.get(Routes.candles.fetch + '?period=7&ticker=tBTCUSD')
       .then(res => {
         const data = res.data
 

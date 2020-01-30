@@ -10,6 +10,7 @@ class CandleController extends AppController {
     super(model)
 
     this.reset()
+    this.openSocketServer()
     // this.openSocket()
   }
 
@@ -39,18 +40,61 @@ class CandleController extends AppController {
     return threshold
   }
 
-  openSocket = () => {
+  openSocketServer = () => {
+    const wss = new WebSocket.Server({ port: 8080 })
+    
+    wss.on('connection', ws => {
+      this.openSocketBitfinex(ws)
+    })
+  }
+
+  openSocketBitfinex = cws => {
     const ws = new WebSocket('wss://api-pub.bitfinex.com/ws/2')
 
     ws.on('message', msg => {
       const response = JSON.parse(msg)
+      const data = response[1]
 
-      if (response instanceof Array && response[1] !== "hb") {
-        response[1][0] = new Date(response[1][0]).toString()
+      if (typeof data !== 'undefined') {
+        if (data.length > 6) {
+          this.reset()
+          this.formatCandlesArray(data)
+
+          this.closes = this.candles.map(candle => candle.close)
+
+          this.mergeSma()
+          this.mergeMacd()
+          this.mergeRsi()
+          this.mergeBullishBearish()
+          this.mergeLowests()
+          this.mergeHighests()
+          this.calculatePositions()
+
+          const trades = this.candles.filter(candle => candle.position !== null)
+
+          const response = {
+            start: {
+              btc: this.startBtc + ' (' + this.startBtc * this.candles[0].close + '$)',
+              usd: this.startUsd
+            },
+            end: {
+              btc: this.btc + ' (' + this.btc * this.candles[this.candles.length -1].close + '$)',
+              usd: this.usd + ' (' + this.usd / this.candles[this.candles.length -1].close + '$)'
+            },
+            numbers: {
+              candles: this.candles.length,
+              trades: trades.length,
+              closes: this.closes.length,
+            },
+            trades: trades,
+            candles: this.candles
+          }
+
+          cws.send(JSON.stringify({ eventName: 'init', data: response }))
+        } else {
+          console.log(data)
+        }
       }
-      
-      console.log('*********************************')
-      console.log(response)
     })
 
     const msg = JSON.stringify({ 
@@ -107,6 +151,33 @@ class CandleController extends AppController {
       })
   }
 
+  formatCandlesArray = candles => {
+    this.candles = candles.map(candle => {
+      return {
+        date: new Date(candle[0]),
+        open: candle[1],
+        close: candle[2],
+        high: candle[3],
+        low: candle[4],
+        volume: candle[5],
+        macd: null,
+        rsi: null,
+        sma: null,
+        bullish: null,
+        bearish: null,
+        support_short: null,
+        support_long: null,
+        resistance_short: null,
+        resistance_long: null,
+        position: null,
+        gain_short: null,
+        gain_long: null,
+        loss_short: null,
+        loss_long: null
+      }
+    })
+  }
+
   fetch = (req, res, next) => {
     this.reset()
     console.log(process.env.TEST)
@@ -128,30 +199,7 @@ class CandleController extends AppController {
     axios.get(url)
       .then(response => {
         if (typeof response.data !== 'undefined') {
-          this.candles = response.data.map(candle => {
-            return {
-              date: new Date(candle[0]),
-              open: candle[1],
-              close: candle[2],
-              high: candle[3],
-              low: candle[4],
-              volume: candle[5],
-              macd: null,
-              rsi: null,
-              sma: null,
-              bullish: null,
-              bearish: null,
-              support_short: null,
-              support_long: null,
-              resistance_short: null,
-              resistance_long: null,
-              position: null,
-              gain_short: null,
-              gain_long: null,
-              loss_short: null,
-              loss_long: null
-            }
-          })
+          this.formatCandlesArray(response.data)
 
           this.closes = this.candles.map(candle => candle.close)
 
