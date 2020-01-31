@@ -2,6 +2,7 @@ import axios from 'axios'
 import indicators from 'technicalindicators'
 import WebSocket from 'ws'
 import AppController from './AppController.mjs'
+import WebSocketClients from '../WebSocketClients.mjs'
 
 // TODO:
 //  Detect short term big gains or loss changes and hodl until the trend inverts
@@ -10,8 +11,7 @@ class CandleController extends AppController {
     super(model)
 
     this.reset()
-    this.openSocketServer()
-    // this.openSocket()
+    this.fetch()
   }
 
   reset = () => {
@@ -40,15 +40,7 @@ class CandleController extends AppController {
     return threshold
   }
 
-  openSocketServer = () => {
-    const wss = new WebSocket.Server({ port: 8080 })
-    
-    wss.on('connection', ws => {
-      this.openSocketBitfinex(ws)
-    })
-  }
-
-  openSocketBitfinex = cws => {
+  openSocketBitfinex = () => {
     const ws = new WebSocket('wss://api-pub.bitfinex.com/ws/2')
 
     ws.on('message', msg => {
@@ -56,43 +48,34 @@ class CandleController extends AppController {
       const data = response[1]
 
       if (typeof data !== 'undefined') {
-        if (data.length > 6) {
-          this.reset()
-          this.formatCandlesArray(data)
+        if (data.length === 6) {
+          if (data !== 'hb') {
+            const candle = this.formatCandleObject(data)
+            const lastCandle = this.candles[this.candles.length - 1]
+            const secondLastCandle = this.candles[this.candles.length - 2]
 
-          this.closes = this.candles.map(candle => candle.close)
+            if (candle.date.getTime() === lastCandle.date.getTime()) {
+              this.candles[this.candles.length - 1] = candle
+            } else if (candle.date.getTime() > secondLastCandle.date.getTime()) {
+              this.candles.push(candle)
 
-          this.mergeSma()
-          this.mergeMacd()
-          this.mergeRsi()
-          this.mergeBullishBearish()
-          this.mergeLowests()
-          this.mergeHighests()
-          this.calculatePositions()
-
-          const trades = this.candles.filter(candle => candle.position !== null)
-
-          const response = {
-            start: {
-              btc: this.startBtc + ' (' + this.startBtc * this.candles[0].close + '$)',
-              usd: this.startUsd
-            },
-            end: {
-              btc: this.btc + ' (' + this.btc * this.candles[this.candles.length -1].close + '$)',
-              usd: this.usd + ' (' + this.usd / this.candles[this.candles.length -1].close + '$)'
-            },
-            numbers: {
-              candles: this.candles.length,
-              trades: trades.length,
-              closes: this.closes.length,
-            },
-            trades: trades,
-            candles: this.candles
+              if (this.candles.length > 900) {
+                this.candles.shift()
+              }
+            }
+  
+            this.closes = this.candles.map(candle => candle.close)
+  
+            this.mergeSma()
+            this.mergeMacd()
+            this.mergeRsi()
+            this.mergeBullishBearish()
+            this.mergeLowests()
+            this.mergeHighests()
+            this.calculatePositions()
+  
+            WebSocketClients.sendAll(this.formatInit())
           }
-
-          cws.send(JSON.stringify({ eventName: 'init', data: response }))
-        } else {
-          console.log(data)
         }
       }
     })
@@ -104,6 +87,30 @@ class CandleController extends AppController {
     })
 
     ws.on('open', () => ws.send(msg))
+  }
+
+  formatInit = () => {
+    const trades = this.candles.filter(candle => candle.position !== null)
+
+    const response = {
+      start: {
+        btc: this.startBtc + ' (' + this.startBtc * this.candles[0].close + '$)',
+        usd: this.startUsd
+      },
+      end: {
+        btc: this.btc + ' (' + this.btc * this.candles[this.candles.length -1].close + '$)',
+        usd: this.usd + ' (' + this.usd / this.candles[this.candles.length -1].close + '$)'
+      },
+      numbers: {
+        candles: this.candles.length,
+        trades: trades.length,
+        closes: this.closes.length,
+      },
+      trades: trades,
+      candles: this.candles
+    }
+
+    return { eventName: 'init', data: response }
   }
 
   tickers = (req, res, next) => {
@@ -152,40 +159,45 @@ class CandleController extends AppController {
   }
 
   formatCandlesArray = candles => {
-    this.candles = candles.map(candle => {
-      return {
-        date: new Date(candle[0]),
-        open: candle[1],
-        close: candle[2],
-        high: candle[3],
-        low: candle[4],
-        volume: candle[5],
-        macd: null,
-        rsi: null,
-        sma: null,
-        bullish: null,
-        bearish: null,
-        support_short: null,
-        support_long: null,
-        resistance_short: null,
-        resistance_long: null,
-        position: null,
-        gain_short: null,
-        gain_long: null,
-        loss_short: null,
-        loss_long: null
-      }
-    })
+    return candles.map(candle => this.formatCandleObject(candle))
   }
 
-  fetch = (req, res, next) => {
-    this.reset()
-    console.log(process.env.TEST)
+  formatCandleObject = candle => {
+    return {
+      date: new Date(candle[0]),
+      open: candle[1],
+      close: candle[2],
+      high: candle[3],
+      low: candle[4],
+      volume: candle[5],
+      macd: null,
+      rsi: null,
+      sma: null,
+      bullish: null,
+      bearish: null,
+      support_short: null,
+      support_long: null,
+      resistance_short: null,
+      resistance_long: null,
+      position: null,
+      gain_short: null,
+      gain_long: null,
+      loss_short: null,
+      loss_long: null
+    }
+  }
 
-    const query = req.query
-    const period = parseInt(query.period) || 7
-    const timeframe = ['5m', '15m', '30m', '1h'].includes(query.timeframe) ? query.timeframe : '5m'
-    const ticker = query.ticker || 'tBTCUSD'
+  fetchInit = () => {
+    return this.formatInit()
+  }
+
+  // fetch = (req, res, next) => {
+  fetch = async () => {
+    this.reset()
+
+    const period =  3
+    const timeframe =  '5m'
+    const ticker = 'tBTCUSD'
 
     const now = Date.now()
     const startPeriod = now - (1000 * 60 * 60 * 24 * period)
@@ -199,7 +211,7 @@ class CandleController extends AppController {
     axios.get(url)
       .then(response => {
         if (typeof response.data !== 'undefined') {
-          this.formatCandlesArray(response.data)
+          this.candles = this.formatCandlesArray(response.data)
 
           this.closes = this.candles.map(candle => candle.close)
 
@@ -211,25 +223,27 @@ class CandleController extends AppController {
           this.mergeHighests()
           this.calculatePositions()
 
-          const trades = this.candles.filter(candle => candle.position !== null)
+          this.openSocketBitfinex()
 
-          res.send({
-            start: {
-              btc: this.startBtc + ' (' + this.startBtc * this.candles[0].close + '$)',
-              usd: this.startUsd
-            },
-            end: {
-              btc: this.btc + ' (' + this.btc * this.candles[this.candles.length -1].close + '$)',
-              usd: this.usd + ' (' + this.usd / this.candles[this.candles.length -1].close + '$)'
-            },
-            numbers: {
-              candles: this.candles.length,
-              trades: trades.length,
-              closes: this.closes.length,
-            },
-            trades: trades,
-            candles: this.candles
-          })
+          // const trades = this.candles.filter(candle => candle.position !== null)
+
+          // res.send({
+          //   start: {
+          //     btc: this.startBtc + ' (' + this.startBtc * this.candles[0].close + '$)',
+          //     usd: this.startUsd
+          //   },
+          //   end: {
+          //     btc: this.btc + ' (' + this.btc * this.candles[this.candles.length -1].close + '$)',
+          //     usd: this.usd + ' (' + this.usd / this.candles[this.candles.length -1].close + '$)'
+          //   },
+          //   numbers: {
+          //     candles: this.candles.length,
+          //     trades: trades.length,
+          //     closes: this.closes.length,
+          //   },
+          //   trades: trades,
+          //   candles: this.candles
+          // })
         } else {
           res.status(500).send('Error')
         }

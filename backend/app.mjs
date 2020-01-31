@@ -3,6 +3,8 @@ import cookieParser from 'cookie-parser'
 import logger from 'morgan'
 import cors from 'cors'
 import indexRouter from './routes/index.mjs'
+import WebSocket from 'ws'
+import WebSocketClients from './WebSocketClients.mjs'
 
 const app = express();
 
@@ -16,5 +18,11 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use('/api/v1', indexRouter)
+
+const wss = new WebSocket.Server({ port: 8080 })
+
+wss.on('connection', ws => {
+    WebSocketClients.add(ws)
+})
 
 export default app

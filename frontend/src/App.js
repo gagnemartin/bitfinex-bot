@@ -12,12 +12,12 @@ class App extends PureComponent {
   }
 
   componentDidMount() {
-    //this.fetchCandles()
+    // this.fetchCandles()
     this.openSocket()
   }
 
   openSocket = () => {
-    const ws = new WebSocket(Routes.candles.socket.replace('http', 'ws').replace('4000', '8080'))
+    const ws = new WebSocket(Routes.sockets.candles)
 
     ws.addEventListener('open', () => {
       ws.addEventListener('message', res => {
@@ -37,6 +37,8 @@ class App extends PureComponent {
           const trades = event.data.trades
 
           this.setState({candles, trades})
+        } else {
+          console.log(res)
         }
       })
     })
@@ -111,6 +113,9 @@ class App extends PureComponent {
 
     return (
       <div className="App">
+        { candles.length > 0 &&
+        <h1>{candles[candles.length - 1][1]}</h1>
+        }
         <div style={{ display: 'grid', gridTemplateColumns: 'auto auto' }}>
           <div>
             <h2>BTC</h2>
