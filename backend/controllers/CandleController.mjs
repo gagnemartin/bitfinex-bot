@@ -53,6 +53,7 @@ class CandleController extends AppController {
             const candle = this.formatCandleObject(data)
             const lastCandle = this.candles[this.candles.length - 1]
             const secondLastCandle = this.candles[this.candles.length - 2]
+            let shouldCalculatePosition = true
 
             if (candle.date.getTime() === lastCandle.date.getTime()) {
               this.candles[this.candles.length - 1] = candle
@@ -62,6 +63,8 @@ class CandleController extends AppController {
               if (this.candles.length > 900) {
                 this.candles.shift()
               }
+            } else {
+              shouldCalculatePosition = false
             }
   
             this.closes = this.candles.map(candle => candle.close)
@@ -72,7 +75,11 @@ class CandleController extends AppController {
             this.mergeBullishBearish()
             this.mergeLowests()
             this.mergeHighests()
-            this.calculatePositions()
+            // this.calculatePositions()
+
+            if (shouldCalculatePosition) {
+              this.calculatePosition(this.candles[this.candles.length - 1])
+            }
   
             WebSocketClients.sendAll(this.formatInit())
           }
@@ -221,7 +228,7 @@ class CandleController extends AppController {
           this.mergeBullishBearish()
           this.mergeLowests()
           this.mergeHighests()
-          this.calculatePositions()
+          // this.calculatePositions()
 
           this.openSocketBitfinex()
 
@@ -455,30 +462,41 @@ class CandleController extends AppController {
     for (let i = 0; i < this.candles.length; i++) {
       const candle = this.candles[i]
 
-      if (this.hasEnoughData(candle)) {
-        if (this.shouldBuy(candle, i)) {
-          candle.position = 'buy'
-          this.lastTrade = candle
+      this.calculatePositions(candle, i)
+    }
+  }
 
-          this.btc = this.usd / candle.close
-          this.usd = 0
+  calculatePosition = (candle, i) => {
+    candle = this.candles[this.candles.length - 1]
+    
+    if (this.hasEnoughData(candle)) {
+      if (this.shouldBuy(candle, i)) {
+        candle.position = 'buy'
+        this.lastTrade = candle
 
-          // console.log('\x1b[32m', '************** BUY **************')
-          // console.log('Btc: ', this.btc)
-          // console.log('Price: ', candle.close)
-          // console.log(' ')
-        } else if (this.shouldSell(candle, i)) {
-          candle.position = 'sell'
-          this.lastTrade = candle
+        this.btc = this.usd / candle.close
+        this.usd = 0
 
-          this.usd = candle.close * this.btc
-          this.btc = 0
+        console.log('\x1b[32m', '************** BUY **************')
+        console.log('Btc: ', this.btc)
+        console.log('Price: ', candle.close)
+        console.log(' ')
+      } else if (this.shouldSell(candle, i)) {
+        candle.position = 'sell'
+        this.lastTrade = candle
 
-          // console.log('\x1b[33m', '************** SELL **************')
-          // console.log('Price: ', candle.close)
-          // console.log(' ')
-        }
+        this.usd = candle.close * this.btc
+        this.btc = 0
+
+        console.log('\x1b[33m', '************** SELL **************')
+        console.log('Price: ', candle.close)
+        console.log(' ')
+      } else {
+        console.clear()
+        console.log("Don't buy or sell. BTC is at", candle.close)
       }
+    } else {
+      console.log('Not enough data to calculate position.')
     }
   }
 
@@ -508,21 +526,21 @@ class CandleController extends AppController {
         if (data.gain_short < data.loss_short && hasLostEnough) {
           return true
         } else {
-          this.candles[i].reason = {
-            isTrendingUp: isTrendingUp,
-            short_loss_higher: data.gain_short < data.loss_short,
-            hasLostEnough: hasLostEnough
-          }
+          // this.candles[i].reason = {
+          //   isTrendingUp: isTrendingUp,
+          //   short_loss_higher: data.gain_short < data.loss_short,
+          //   hasLostEnough: hasLostEnough
+          // }
         }
       } else {
         if (data.gain_long < data.loss_long && hasLostEnough) {
           return true
         } else {
-          this.candles[i].reason = {
-            isTrendingUp: isTrendingUp,
-            long_loss_higher: data.gain_long < data.loss_long,
-            hasLostEnough: hasLostEnough
-          }
+          // this.candles[i].reason = {
+          //   isTrendingUp: isTrendingUp,
+          //   long_loss_higher: data.gain_long < data.loss_long,
+          //   hasLostEnough: hasLostEnough
+          // }
         }
       }
 
@@ -562,21 +580,21 @@ class CandleController extends AppController {
         if (data.gain_long > data.loss_long && hasGainedEnough) {
           return true
         } else {
-          this.candles[i].reason = {
-            isTrendingUp: isTrendingUp,
-            short_gain_higher: data.gain_long > data.loss_long ,
-            hasGainedEnough: hasGainedEnough
-          }
+          // this.candles[i].reason = {
+          //   isTrendingUp: isTrendingUp,
+          //   short_gain_higher: data.gain_long > data.loss_long ,
+          //   hasGainedEnough: hasGainedEnough
+          // }
         }
       } else {
         if (data.gain_short > data.loss_short && hasGainedEnough) {
           return true
         } else {
-          this.candles[i].reason = {
-            isTrendingUp: isTrendingUp,
-            short_gain_higher: data.gain_short > data.loss_short ,
-            hasGainedEnough: hasGainedEnough
-          }
+          // this.candles[i].reason = {
+          //   isTrendingUp: isTrendingUp,
+          //   short_gain_higher: data.gain_short > data.loss_short ,
+          //   hasGainedEnough: hasGainedEnough
+          // }
         }
       }
 
