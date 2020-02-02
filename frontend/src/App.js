@@ -7,12 +7,13 @@ import './App.css'
 
 class App extends PureComponent {
   state = {
+    balance: {},
     candles: [],
-    trades: []
+    trades: [],
+    wallets: []
   }
 
   componentDidMount() {
-    // this.fetchCandles()
     this.openSocket()
   }
 
@@ -20,12 +21,13 @@ class App extends PureComponent {
     const ws = new WebSocket(Routes.sockets.candles)
 
     ws.addEventListener('open', () => {
-      ws.addEventListener('message', res => {
-        const event = JSON.parse(res.data)
-        console.log(event.data)
+      ws.addEventListener('message', msg => {
+        const response = JSON.parse(msg.data)
+        const event = response.event
+        console.log(response)
         
-        if (event.eventName === 'init') {
-          const candles = event.data.candles.map(candle => {
+        if (event === 'init') {
+          const candles = response.data.candles.map(candle => {
             return [
               new Date(candle.date),
               candle.close,
@@ -34,11 +36,26 @@ class App extends PureComponent {
             ]
           })
 
-          const trades = event.data.trades
+          const trades = response.data.trades
 
           this.setState({candles, trades})
-        } else {
-          console.log(res)
+        } else if (event === 'bu') {
+          this.setState({
+            balance: response.data
+          })
+        } else if (event === 'wu') {
+          console.log(response.data)
+          const walletIndex = this.state.wallets.findIndex(wallet => wallet.currency === response.data.currency)
+
+          if (walletIndex >= 0) {
+            this.setState(prevState => ({
+              wallets: [ ...prevState.wallets.splice(0, walletIndex), response.data, ...prevState.wallets.splice(walletIndex + 1) ]
+            }))
+          } else {
+            this.setState(prevState => ({
+              wallets: [ ...prevState.wallets, [response.data] ]
+            }))
+          }
         }
       })
     })
@@ -103,7 +120,7 @@ class App extends PureComponent {
   }
 
   render() {
-    const { candles, trades } = this.state
+    const { balance, candles, trades, wallets } = this.state
     const { start, end } = this.claculateStartEnd()
     const differenceBtc = end.btc - start.btc
     const differencePercentageBtc = ((end.btc - start.btc) / start.btc) * 100
@@ -116,7 +133,7 @@ class App extends PureComponent {
         { candles.length > 0 &&
         <h1>{candles[candles.length - 1][1]}</h1>
         }
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto auto' }}>
           <div>
             <h2>BTC</h2>
             <p> 
@@ -133,6 +150,20 @@ class App extends PureComponent {
               End: {end.usd} <br/>
               { (differencePercentageUsd > 0 ? '+' : '') }{differencePercentageUsd.toFixed(2)}% ({ (differenceUsd > 0 ? '+' : '') }{differenceUsd})
             </p>
+          </div>
+
+          <div>
+            <h2>BALANCE</h2>
+            {typeof balance.aum !== 'undefined' &&
+              <p>${balance.aum.toFixed(2)}</p>
+            }
+          </div>
+
+          <div>
+            <h2>WALLETS</h2>
+            { wallets.map(wallet => (
+              <p>{wallet.balance}</p>
+            ))}
           </div>
         </div>
         

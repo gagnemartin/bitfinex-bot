@@ -66,33 +66,46 @@ class CandleController extends AppController {
     })
 
     ws.on('message', msg => {
+      const sendEvent = (event, eventData) => {
+        let eventName = event
+
+        if (eventName === 'bs') eventName = 'bu'
+        if (eventName === 'ws') eventName = 'wu'
+
+        const data = {
+          event: eventName,
+          data: {}
+        }
+
+        if (event === 'bu') {
+          data.data = {
+            aum: eventData[0],
+            aum_net: eventData[1]
+          }
+        } else {
+          const keys = ['wallet_type', 'currency', 'balance', 'unsettled_interest', 'balance_available', 'description', 'meta']
+          
+          keys.forEach((key, i) => {
+            data.data[key] = eventData[i]
+          })
+        }
+        
+        WebSocketClients.sendAll(data)
+      }
       const response = JSON.parse(msg)
 
       if (response.event === 'auth' && response.status === 'OK') {
         this.openSocketBitfinex()
       }
 
-      if (['wu', 'bu'].includes(response[1])) {
-        const data = {
-          event: response[1],
-          data: {}
-        }
-
-        if (response[1] === 'bu') {
-          data.data = {
-            aum: response[2][0],
-            aum_net: response[2][1]
-          }
-        } else {
-          const keys = ['wallet_type', 'currency', 'balance', 'unsettled_interest', 'balance_available', 'description', 'meta']
-          
-          keys.forEach((key, i) => {
-            data.data[key] = response[2][i]
+      if (['bu', 'bs', 'wu', 'ws'].includes(response[1])) {
+        if (['bs', 'ws'].includes(response[1])) {
+          response[2].forEach(data => {
+            sendEvent(response[1], data)
           })
+        } else {
+          sendEvent(response[1], response[2])
         }
-
-
-        console.log(data)
       }
     })
   }
@@ -174,7 +187,7 @@ class CandleController extends AppController {
       candles: this.candles
     }
 
-    return { eventName: 'init', data: response }
+    return { event: 'init', data: response }
   }
 
   tickers = (req, res, next) => {
