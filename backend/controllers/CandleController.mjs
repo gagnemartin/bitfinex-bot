@@ -1,6 +1,7 @@
 import axios from 'axios'
 import indicators from 'technicalindicators'
 import WebSocket from 'ws'
+import crypto from 'crypto-js'
 import AppController from './AppController.mjs'
 import WebSocketClients from '../WebSocketClients.mjs'
 
@@ -40,10 +41,75 @@ class CandleController extends AppController {
     return threshold
   }
 
-  openSocketBitfinex = () => {
-    const ws = new WebSocket('wss://api-pub.bitfinex.com/ws/2')
+  openSocketPrivate = () => {
+    const ws = new WebSocket('wss://api.bitfinex.com/ws/2')
+
+    const authNonce = Date.now() * 10000 // Generate an ever increasing, single use value. (a timestamp satisfies this criteria)
+    const authPayload = 'AUTH' + authNonce // Compile the authentication payload, this is simply the string 'AUTH' prepended to the nonce value
+    const authSig = crypto.HmacSHA384(authPayload, process.env.API_SECRET).toString(crypto.enc.Hex) // The authentication payload i
+    const apiKey = process.env.API_PUBLIC
+
+    const payload = {
+      apiKey, //API key
+      authSig, //Authentication Sig
+      authNonce, 
+      authPayload,
+      event: 'auth', // The connection event, will always equal 'auth'
+      filter: [
+        'balance',
+        'wallet'
+      ]
+    }
+
+    ws.on('open', () => {
+      ws.send(JSON.stringify(payload))
+    })
 
     ws.on('message', msg => {
+      const response = JSON.parse(msg)
+
+      if (response.event === 'auth' && response.status === 'OK') {
+        this.openSocketBitfinex()
+      }
+
+      if (['wu', 'bu'].includes(response[1])) {
+        const data = {
+          event: response[1],
+          data: {}
+        }
+
+        if (response[1] === 'bu') {
+          data.data = {
+            aum: response[2][0],
+            aum_net: response[2][1]
+          }
+        } else {
+          const keys = ['wallet_type', 'currency', 'balance', 'unsettled_interest', 'balance_available', 'description', 'meta']
+          
+          keys.forEach((key, i) => {
+            data.data[key] = response[2][i]
+          })
+        }
+
+
+        console.log(data)
+      }
+    })
+  }
+
+  openSocketBitfinex = () => {
+    const wsPublic = new WebSocket('wss://api-pub.bitfinex.com/ws/2')
+    
+
+    const payloadCandles = JSON.stringify({ 
+      event: 'subscribe', 
+      channel: 'candles', 
+      key: 'trade:5m:tBTCUSD' //'trade:TIMEFRAME:SYMBOL'
+    })
+
+    wsPublic.on('open', () => wsPublic.send(payloadCandles))
+
+    wsPublic.on('message', msg => {
       const response = JSON.parse(msg)
       const data = response[1]
 
@@ -75,7 +141,6 @@ class CandleController extends AppController {
             this.mergeBullishBearish()
             this.mergeLowests()
             this.mergeHighests()
-            // this.calculatePositions()
 
             if (shouldCalculatePosition) {
               this.calculatePosition(this.candles[this.candles.length - 1])
@@ -86,14 +151,6 @@ class CandleController extends AppController {
         }
       }
     })
-
-    const msg = JSON.stringify({ 
-      event: 'subscribe', 
-      channel: 'candles', 
-      key: 'trade:5m:tBTCUSD' //'trade:TIMEFRAME:SYMBOL'
-    })
-
-    ws.on('open', () => ws.send(msg))
   }
 
   formatInit = () => {
@@ -228,35 +285,15 @@ class CandleController extends AppController {
           this.mergeBullishBearish()
           this.mergeLowests()
           this.mergeHighests()
-          // this.calculatePositions()
 
-          this.openSocketBitfinex()
-
-          // const trades = this.candles.filter(candle => candle.position !== null)
-
-          // res.send({
-          //   start: {
-          //     btc: this.startBtc + ' (' + this.startBtc * this.candles[0].close + '$)',
-          //     usd: this.startUsd
-          //   },
-          //   end: {
-          //     btc: this.btc + ' (' + this.btc * this.candles[this.candles.length -1].close + '$)',
-          //     usd: this.usd + ' (' + this.usd / this.candles[this.candles.length -1].close + '$)'
-          //   },
-          //   numbers: {
-          //     candles: this.candles.length,
-          //     trades: trades.length,
-          //     closes: this.closes.length,
-          //   },
-          //   trades: trades,
-          //   candles: this.candles
-          // })
+          //this.openSocketBitfinex()
+          this.openSocketPrivate()
         } else {
           res.status(500).send('Error')
         }
       })
       .catch(e => {
-        res.status(500).send(e)
+        // res.status(500).send(e)
         console.error(e)
       })
   }
