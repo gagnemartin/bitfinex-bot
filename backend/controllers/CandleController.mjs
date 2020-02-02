@@ -6,7 +6,7 @@ import AppController from './AppController.mjs'
 import WebSocketClients from '../WebSocketClients.mjs'
 
 // TODO:
-//  Detect short term big gains or loss changes and hodl until the trend inverts
+//  Send balance and wallet snapshots only when the client connects
 class CandleController extends AppController {
   constructor(model) {
     super(model)

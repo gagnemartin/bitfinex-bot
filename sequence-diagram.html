@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <div class="mermaid">
+    sequenceDiagram
+      participant Client
+      participant Server
+      participant Bitfinex
+
+      Server ->> Bitfinex: REST Fetch Candles
+      Bitfinex -->> Server: Return Candles
+      Server ->> Server: Store Candles
+
+      Server -x + Bitfinex: Websocket Connection
+      Bitfinex --x Server: Connection successful
+      Server -x Bitfinex: Candles Subscription
+      Bitfinex --x - Server: Candles Snapshot
+      Note right of Bitfinex: Ignore the candles Snapshot
+
+      Server -x + Bitfinex: Authenticated Websocket
+      Bitfinex --x Server: Connection successful
+      Note over Server, Bitfinex: Filter for only Balance and Wallets
+
+      Bitfinex --x Server: Wallets Snapshot
+      Server ->> Server: Store Wallets
+
+      Bitfinex --x Server: Balance Snapshot
+      Server ->> - Server: Store  Balance
+
+      opt Client connection
+      Client --x Server: Websocket Connection
+      Server -x Client: Send all stored candles, wallets and balance
+      Note over Client, Server: Connection could've happened anytime
+      end
+
+      Bitfinex --x + Server: Candle Update
+      Server -x Server: Update or add new Candle
+      Server -x Server: Calculate position
+
+      opt New order
+      Server -x Bitfinex: Sell or Buy order
+      Bitfinex --x Server: Order confirmation
+      end
+
+      opt Update frontend
+      Server -x - Client: Send new or updated Candle
+      end
+
+      Bitfinex --x + Server: Wallet Update
+      Server -x Server: Update Wallets
+      opt Update frontend
+      Server -x - Client: Send updated Wallets
+      end
+
+      Bitfinex --x + Server: Balance Update
+      Server -x Server: Update Balance
+      opt Update frontend
+      Server -x - Client: Send updated Balance
+      end
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@8.4.0/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({startOnLoad:true});</script>
+</body>
+</html>
