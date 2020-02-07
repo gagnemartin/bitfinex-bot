@@ -59,6 +59,7 @@ class CandleController extends AppController {
       event: 'auth', // The connection event, will always equal 'auth'
       filter: [
         'balance',
+        'trading',
         'wallet'
       ]
     }
@@ -107,6 +108,10 @@ class CandleController extends AppController {
           } else {
             sendEvent(event, response[2])
           }
+        } else if (['te', 'tu'].includes(event)) {
+          console.log('TRADE:', response[2])
+        } else if (['os', 'on', 'ou', 'oc'].includes(event)) {
+          console.log('ORDER:', response)
         }
       })
     })
