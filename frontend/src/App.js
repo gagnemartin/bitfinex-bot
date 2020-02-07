@@ -28,23 +28,29 @@ class App extends PureComponent {
         
         if (event === 'init') {
           const candles = response.data.candles.map(candle => {
-            return [
-              new Date(candle.date),
-              candle.close,
-              candle.position,
-              '<pre><code>' + JSON.stringify(candle, null, 2) + '</code></pre>'
-            ]
+            return this.formatCandle(candle)
           })
 
-          const trades = response.data.trades
+          const { balance, trades, wallets} = response.data
 
-          this.setState({candles, trades})
+          this.setState({balance, candles, trades, wallets})
+        } else if (event === 'cn') {
+          const candle = this.formatCandle(response.data)
+
+          this.setState(prevState => ({
+            candles: [ ...prevState.candles, candle ]
+          }))
+        } else if (event === 'cu') {
+          const candle = this.formatCandle(response.data)
+
+          this.setState(prevState => ({
+            candles: [ ...prevState.candles.splice(0, prevState.candles.length - 1), candle ]
+          }))
         } else if (event === 'bu') {
           this.setState({
             balance: response.data
           })
         } else if (event === 'wu') {
-          console.log(response.data)
           const walletIndex = this.state.wallets.findIndex(wallet => wallet.currency === response.data.currency)
 
           if (walletIndex >= 0) {
@@ -59,6 +65,15 @@ class App extends PureComponent {
         }
       })
     })
+  }
+
+  formatCandle = data => {
+    return [
+      new Date(data.date),
+      data.close,
+      data.position,
+      '<pre><code>' + JSON.stringify(data, null, 2) + '</code></pre>'
+    ]
   }
 
   fetchCandles = () => {
@@ -162,7 +177,7 @@ class App extends PureComponent {
           <div>
             <h2>WALLETS</h2>
             { wallets.map(wallet => (
-              <p>{wallet.balance}</p>
+              <p key={`wallet-${wallet.currency}`}>{wallet.currency}: {wallet.balance}</p>
             ))}
           </div>
         </div>

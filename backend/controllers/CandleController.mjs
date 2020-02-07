@@ -17,6 +17,8 @@ class CandleController extends AppController {
 
   reset = () => {
     this.candles = []
+    this.balance = {}
+    this.wallets = []
     this.closes = []
     this.lastTrade = { position: 'buy', close: 7219.3 }
     this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
@@ -63,51 +65,83 @@ class CandleController extends AppController {
 
     ws.on('open', () => {
       ws.send(JSON.stringify(payload))
-    })
 
-    ws.on('message', msg => {
-      const sendEvent = (event, eventData) => {
-        let eventName = event
-
-        if (eventName === 'bs') eventName = 'bu'
-        if (eventName === 'ws') eventName = 'wu'
-
-        const data = {
-          event: eventName,
-          data: {}
-        }
-
-        if (event === 'bu') {
-          data.data = {
-            aum: eventData[0],
-            aum_net: eventData[1]
+      ws.on('message', msg => {
+        const sendEvent = (event, eventData) => {
+          const data = {
+            data: {},
+            event
           }
-        } else {
-          const keys = ['wallet_type', 'currency', 'balance', 'unsettled_interest', 'balance_available', 'description', 'meta']
+  
+          if (event === 'bu') {
+            data.data = this.formatBalanceData(eventData)
+            this.updateBalance(data.data)
+          } else {
+            data.data = this.formatWalletData(eventData)
+            this.updateWallets(data.data)
+          }
           
-          keys.forEach((key, i) => {
-            data.data[key] = eventData[i]
-          })
+          WebSocketClients.sendAll(data)
         }
-        
-        WebSocketClients.sendAll(data)
-      }
-      const response = JSON.parse(msg)
-
-      if (response.event === 'auth' && response.status === 'OK') {
-        this.openSocketBitfinex()
-      }
-
-      if (['bu', 'bs', 'wu', 'ws'].includes(response[1])) {
-        if (['bs', 'ws'].includes(response[1])) {
-          response[2].forEach(data => {
-            sendEvent(response[1], data)
-          })
-        } else {
-          sendEvent(response[1], response[2])
+        const response = JSON.parse(msg)
+        const event = response[1]
+  
+        if (response.event === 'auth' && response.status === 'OK') {
+          this.openSocketBitfinex()
         }
-      }
+  
+        if (['bu', 'bs', 'wu', 'ws'].includes(event)) {
+          // Balance and Wallets snapshots
+          if (['bs', 'ws'].includes(event)) {
+            response[2].forEach(data => {
+              if (event === 'bs') {
+                const snapshot = this.formatBalanceData(data)
+  
+                this.updateBalance(snapshot)
+              } else {
+                const snapshot = this.formatWalletData(data)
+  
+                this.updateWallets(snapshot)
+              }
+            })
+          } else {
+            sendEvent(event, response[2])
+          }
+        }
+      })
     })
+  }
+
+  updateBalance = data => {
+    this.balance = data
+  }
+
+  updateWallets = data => {
+    const index = this.wallets.findIndex(wallet => wallet.currency === data.currency)
+
+    if (index >= 0) {
+      this.wallets[index] = data
+    } else {
+      this.wallets.push(data)
+    }
+  }
+
+  formatBalanceData = data => {
+    return {
+      aum: data[0],
+      aum_net: data[1]
+    }
+  }
+
+  formatWalletData = data => {
+    const newData = {}
+    const keys = ['wallet_type', 'currency', 'balance', 'unsettled_interest', 'balance_available', 'description', 'meta']
+          
+    keys.forEach((key, i) => {
+      newData[key] = data[i]
+    })
+
+    return newData
   }
 
   openSocketBitfinex = () => {
@@ -132,34 +166,43 @@ class CandleController extends AppController {
             const candle = this.formatCandleObject(data)
             const lastCandle = this.candles[this.candles.length - 1]
             const secondLastCandle = this.candles[this.candles.length - 2]
+            // cu = Candle Update
+            // cn = Candle New
+            let event = 'cu'
             let shouldCalculatePosition = true
 
+            // Update latest candle
             if (candle.date.getTime() === lastCandle.date.getTime()) {
               this.candles[this.candles.length - 1] = candle
             } else if (candle.date.getTime() > secondLastCandle.date.getTime()) {
+              // Push new candle
               this.candles.push(candle)
+              event = 'cn'
 
               if (this.candles.length > 900) {
                 this.candles.shift()
               }
             } else {
+              // It's the previous candle, do nothing.
               shouldCalculatePosition = false
             }
-  
-            this.closes = this.candles.map(candle => candle.close)
-  
-            this.mergeSma()
-            this.mergeMacd()
-            this.mergeRsi()
-            this.mergeBullishBearish()
-            this.mergeLowests()
-            this.mergeHighests()
 
             if (shouldCalculatePosition) {
-              this.calculatePosition(this.candles[this.candles.length - 1])
-            }
+              this.closes = this.candles.map(candle => candle.close)
   
-            WebSocketClients.sendAll(this.formatInit())
+              this.mergeSma()
+              this.mergeMacd()
+              this.mergeRsi()
+              this.mergeBullishBearish()
+              this.mergeLowests()
+              this.mergeHighests()
+              this.calculatePosition(this.candles[this.candles.length - 1])
+
+              WebSocketClients.sendAll({
+                data: this.candles[this.candles.length - 1],
+                event
+              })
+            }
           }
         }
       }
@@ -184,7 +227,9 @@ class CandleController extends AppController {
         closes: this.closes.length,
       },
       trades: trades,
-      candles: this.candles
+      candles: this.candles,
+      balance: this.balance,
+      wallets: this.wallets
     }
 
     return { event: 'init', data: response }
@@ -266,6 +311,12 @@ class CandleController extends AppController {
 
   fetchInit = () => {
     return this.formatInit()
+  }
+
+  fetchBalance = () => {
+    return {
+      event: ''
+    }
   }
 
   // fetch = (req, res, next) => {
