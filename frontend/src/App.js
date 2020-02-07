@@ -134,39 +134,27 @@ class App extends PureComponent {
     return close < lastClose
   }
 
+  updatePageTitle = () => {
+    const candles = this.state.candles
+
+    if (candles.length > 0) {
+      const lastCandle = candles[candles.length - 1]
+
+      document.title = `BTCUSD ${lastCandle[1]}`
+    }
+  }
+
   render() {
     const { balance, candles, trades, wallets } = this.state
-    const { start, end } = this.claculateStartEnd()
-    const differenceBtc = end.btc - start.btc
-    const differencePercentageBtc = ((end.btc - start.btc) / start.btc) * 100
 
-    const differenceUsd = end.usd - start.usd
-    const differencePercentageUsd = ((end.usd - start.usd) / start.usd) * 100
+    this.updatePageTitle()
 
     return (
       <div className="App">
         { candles.length > 0 &&
         <h1>{candles[candles.length - 1][1]}</h1>
         }
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto auto' }}>
-          <div>
-            <h2>BTC</h2>
-            <p> 
-              Start: {start.btc} <br/>
-              End: {end.btc} <br/>
-              { (differencePercentageBtc > 0 ? '+' : '') }{differencePercentageBtc.toFixed(2)}% ({ (differenceBtc > 0 ? '+' : '') }{differenceBtc})
-            </p>
-          </div>
-
-          <div>
-            <h2>USD</h2>
-            <p> 
-              Start: {start.usd} <br/>
-              End: {end.usd} <br/>
-              { (differencePercentageUsd > 0 ? '+' : '') }{differencePercentageUsd.toFixed(2)}% ({ (differenceUsd > 0 ? '+' : '') }{differenceUsd})
-            </p>
-          </div>
-
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto auto' }}>
           <div>
             <h2>BALANCE</h2>
             {typeof balance.aum !== 'undefined' &&
