@@ -4,12 +4,12 @@ import logger from 'morgan'
 import cors from 'cors'
 import indexRouter from './routes/index.mjs'
 import WebSocket from 'ws'
-import WebSocketClients from './WebSocketClients.mjs'
+import WebSocketClients from './websockets/WebSocketClients.mjs'
 
 const app = express();
 
 app.use(cors({
-    origin: "http://localhost:3000"
+  origin: "http://localhost:3000"
 }))
 
 app.use(logger('dev'));
@@ -22,7 +22,7 @@ app.use('/api/v1', indexRouter)
 const wss = new WebSocket.Server({ port: 8080 })
 
 wss.on('connection', ws => {
-    WebSocketClients.add(ws)
+  WebSocketClients.add(ws)
 })
 
 export default app
