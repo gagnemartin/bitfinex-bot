@@ -1,3 +1,5 @@
+import axios from 'axios'
+import crypto from 'crypto-js'
 import AppController from './AppController.mjs'
 import SocketExchangeController from './SocketExchangeController.mjs'
 import Trading from '../models/Trading.mjs'
@@ -5,6 +7,8 @@ import Trading from '../models/Trading.mjs'
 class TradingController extends AppController {
   constructor(model) {
     super(model)
+
+    this.fetchTrades()
   }
 
   /**
@@ -31,11 +35,42 @@ class TradingController extends AppController {
   }
 
   /**
+   * Request the exchange REST API to get the trades history
+   */
+  fetchTrades = () => {
+    const apiKey = process.env.API_PUBLIC
+    const apiSecret = process.env.API_SECRET
+    const apiPath = 'v2/auth/r/trades/tBTCUSD/hist'
+    const nonce = (Date.now() * 1000).toString()
+    const body = {
+      limit: 50
+    }
+    const signature = `/api/${apiPath}${nonce}${JSON.stringify(body)}`
+    const sig = crypto.HmacSHA384(signature, apiSecret).toString() 
+    const url = `https://api.bitfinex.com/${apiPath}`
+    const config = {
+      headers: {
+        'bfx-nonce': nonce,
+        'bfx-apikey': apiKey,
+        'bfx-signature': sig
+      }
+    }
+
+    axios.post(url, body, config)
+      .then(res => {
+        this.model.setTrades(res.data)
+      })
+      .catch(e => {
+        console.error(e.response.data)
+      })
+  }
+
+  /**
    * Return the balance
    * 
    * @return {Object} Balance object
    */
-  fetchBalance = () => {
+  getBalance = () => {
     return this.model.balance
   }
   
@@ -44,8 +79,17 @@ class TradingController extends AppController {
    * 
    * @return {Array} Wallets array
    */
-  fetchWallets = () => {
+  getWallets = () => {
     return this.model.wallets
+  }
+  
+  /**
+   * Return the trades
+   * 
+   * @return {Array} Trades array
+   */
+  getTrades = () => {
+    return this.model.trades
   }
 }
 

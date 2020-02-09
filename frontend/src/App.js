@@ -33,7 +33,7 @@ class App extends PureComponent {
 
           const { balance, trades, wallets} = response.data
 
-          this.setState({balance, candles, trades, wallets})
+          this.setState({balance, candles, trades: trades.reverse(), wallets})
         } else if (event === 'cn') {
           const candle = this.formatCandle(response.data)
 
@@ -126,12 +126,12 @@ class App extends PureComponent {
     return data
   }
 
-  isNotLoss = (position, close, lastClose) => {
-    if (position === 'sell') {
+  isNotLoss = (trade, previousTrade) => {
+    if (Math.sign(trade.exec_amount) === 1) {
       return true
     }
 
-    return close < lastClose
+    return trade.exec_price < previousTrade.exec_price
   }
 
   updatePageTitle = () => {
@@ -201,10 +201,10 @@ class App extends PureComponent {
 
           <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
           <ul className="list-group list-group-flush">
-            {trades.reverse().map((trade, i) => (
-              <li className={"list-group-item " + (( (i + 1) < trades.length && this.isNotLoss(trade.position, trade.close, trades[i + 1].close)) ? '' : 'list-group-item-danger')} key={trade.close}>
-                {trade.position.toUpperCase()} <br/>
-                {trade.close}
+            {trades.map((trade, i) => (
+              <li className={"list-group-item " + (( (i + 1) < trades.length && this.isNotLoss(trade, trades[i + 1])) ? '' : 'list-group-item-danger')} key={trade.exec_price}>
+                {Math.sign(trade.exec_amount) === 1 ? 'BUY' : 'SELL'} <br/>
+                {trade.exec_price}
               </li>
             ))}
           </ul>

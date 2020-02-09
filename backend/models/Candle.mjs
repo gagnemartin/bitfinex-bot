@@ -330,9 +330,9 @@ class Candle {
    */
   formatInit = () => {
     const candles = this.candles
-    const trades = candles.filter(candle => candle.position !== null)
-    const balance = TradingController.fetchBalance()
-    const wallets = TradingController.fetchWallets()
+    const trades = TradingController.getTrades()
+    const balance = TradingController.getBalance()
+    const wallets = TradingController.getWallets()
 
     const response = {
       trades,

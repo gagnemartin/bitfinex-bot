@@ -5,7 +5,6 @@ class Trading {
     this.balance = {}
     this.trades = []
     this.wallets = []
-    this.lastTrade = { position: 'buy', close: 7219.3 }
     this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
     this.thresholdDecrease = this.resetThreshold('thresholdDecrease')
   }
@@ -129,19 +128,13 @@ class Trading {
 
     if (this.hasEnoughData(candle)) {
       if (this.shouldBuy(candle)) {
-        this.lastTrade = candle
-
-        this.btc = this.usd / candle.close
-        this.usd = 0
 
         console.log('\x1b[32m', '************** BUY **************')
-        console.log('Btc: ', this.btc)
         console.log('Price: ', candle.close)
         console.log(' ')
 
         return 'buy'
       } else if (this.shouldSell(candle)) {
-        this.lastTrade = candle
 
         console.log('\x1b[33m', '************** SELL **************')
         console.log('Price: ', candle.close)
@@ -181,10 +174,10 @@ class Trading {
    * @return {Boolean} Should buy or not
    */
   shouldBuy = data => {
-    const lastTrade = this.lastTrade
+    const lastTrade = this.trades[this.trades.length - 1]
 
     // Can't buy 2 times in a row
-    if (lastTrade.position === 'sell') {
+    if (Math.sign(lastTrade.exec_amount) === -1) {
       const isTrendingUp = this.isTrendingUp(data)
       const hasLostEnough = this.hasLostEnough(data, isTrendingUp)
 
@@ -209,10 +202,10 @@ class Trading {
    * @return {Boolean} Should sell or not
    */
   shouldSell = data => {
-    const lastTrade = this.lastTrade
+    const lastTrade = this.trades[this.trades.length - 1]
 
     // Can't sell 2 times in a row
-    if (lastTrade.position === 'buy') {
+    if (Math.sign(lastTrade.exec_amount) === 1) {
       // If trending up (gain long > loss long)
         // HODL till long loss
       // Else (trending down -> gain long < loss long)
@@ -235,9 +228,9 @@ class Trading {
   }
 
   isTrendingUp = data => {
-    const lastTrade = this.lastTrade
+    const lastTrade = this.trades[this.trades.length - 1]
 
-    return (data.gain_short > data.loss_short) && data.close > lastTrade.close
+    return (data.gain_short > data.loss_short) && data.close > lastTrade.exec_price
   }
 
   /**
@@ -277,12 +270,13 @@ class Trading {
    * @return {Boolean} Has lost enough or not
    */
   hasLostEnough = (data, isTrendingUp) => {
+    const lastTrade = this.trades[this.trades.length - 1]
     const percentage = this.percentageDecrease(data)
     const percentageThreshold = isTrendingUp ? -3 : -1
     const hoursBetweenThreshold = isTrendingUp ? 0.3 : 5
     const decreaseThreshold = isTrendingUp ? 0.3 : 0.05
 
-    if (percentage <= percentageThreshold && this.hoursBetween(this.lastTrade.date, data.date) >= hoursBetweenThreshold) {
+    if (percentage <= percentageThreshold && this.hoursBetween(lastTrade.mts_create, data.date) >= hoursBetweenThreshold) {
       this.thresholdDecrease = this.resetThreshold('thresholdDecrease')
       return true
     }
@@ -316,7 +310,8 @@ class Trading {
    * @return {Number} Float of a percentage
    */
   percentageIncrease = data => {
-    return ((data.close - this.lastTrade.close) / this.lastTrade.close) * 100
+    const lastTrade = this.trades[this.trades.length - 1]
+    return ((data.close - lastTrade.exec_price) / lastTrade.exec_price) * 100
   }
 
   /**
@@ -326,7 +321,8 @@ class Trading {
    * @return {Number} Float of a percentage
    */
   percentageDecrease = data => {
-    return ((this.lastTrade.close - data.close) / this.lastTrade.close) * 100
+    const lastTrade = this.trades[this.trades.length - 1]
+    return ((lastTrade.exec_price - data.close) / lastTrade.exec_price) * 100
   }
 
   /**
@@ -344,6 +340,31 @@ class Trading {
     }
 
     return threshold
+  }
+
+  setTrades = data => {
+    data.forEach(trade => {
+      const tradeObject = this.formatTrade(trade)
+      this.trades.unshift(tradeObject)
+    })
+  }
+
+  formatTrade = data => {
+    const trade = {}
+    const keys = [
+      'id', 'pair', 'mts_create', 'order_id', 'exec_amount', 'exec_price', 
+      'order_type', 'order_price', 'maker', 'fee', 'fee_currency'
+    ]
+
+    data.forEach((element, i) => {
+      if (keys[i] === 'mts_create') {
+        element = new Date(element)
+      }
+
+      trade[keys[i]] = element
+    })
+
+    return trade
   }
 }
 
