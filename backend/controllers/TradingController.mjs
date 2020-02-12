@@ -1,5 +1,4 @@
 import axios from 'axios'
-import crypto from 'crypto-js'
 import AppController from './AppController.mjs'
 import SocketExchangeController from './SocketExchangeController.mjs'
 import Trading from '../models/Trading.mjs'
@@ -38,25 +37,11 @@ class TradingController extends AppController {
    * Request the exchange REST API to get the trades history
    */
   fetchTrades = () => {
-    const apiKey = process.env.API_PUBLIC
-    const apiSecret = process.env.API_SECRET
-    const apiPath = 'v2/auth/r/trades/tBTCUSD/hist'
-    const nonce = (Date.now() * 1000).toString()
-    const body = {
-      limit: 50
-    }
-    const signature = `/api/${apiPath}${nonce}${JSON.stringify(body)}`
-    const sig = crypto.HmacSHA384(signature, apiSecret).toString() 
-    const url = `https://api.bitfinex.com/${apiPath}`
-    const config = {
-      headers: {
-        'bfx-nonce': nonce,
-        'bfx-apikey': apiKey,
-        'bfx-signature': sig
-      }
-    }
+    const params =  { limit: 50 }
+    const { url, headers } = this.model.getRestConfig('trades', params)
+    const config = { headers }
 
-    axios.post(url, body, config)
+    axios.post(url, params, config)
       .then(res => {
         this.model.setTrades(res.data)
       })
@@ -90,6 +75,39 @@ class TradingController extends AppController {
    */
   getTrades = () => {
     return this.model.trades
+  }
+
+  newOrder = data => {
+    const isSell = data.position === 'sell'
+    const walletBTC = this.model.wallets.find(wallet => wallet.currency === 'BTC')
+    const walletUSD = this.model.wallets.find(wallet => wallet.currency === 'USD')
+    const walletNeeded = isSell ? walletBTC : walletUSD
+    
+    if (['buy', 'sell'].includes(data.position) && typeof walletNeeded !== 'undefined') {
+      const price = data.close.toString()
+      const amount = (isSell ? -walletBTC.balance_available : walletUSD.balance_available / data.close).toString()
+
+      if (amount !== 0) {
+        const params = {
+          type: 'EXCHANGE MARKET',
+          symbol: 'tBTCUSD',
+          price,
+          amount
+          // flags: 0, // optional param to add flags
+          // meta: {aff_code: "AFF_CODE_HERE"} // optional param to pass an affiliate code
+        }
+        const { url, headers } = this.model.getRestConfig('newOrder', params)
+        const config = { headers }
+  
+        axios.post(url, params, config)
+        .then(res => {
+          console.log(res.data)
+        })
+        .catch(e => {
+          console.error(e.response.data)
+        })
+      }
+    }
   }
 }
 

@@ -1,3 +1,4 @@
+import crypto from 'crypto-js'
 import WebSocketClients from '../websockets/WebSocketClients.mjs'
 
 class Trading {
@@ -34,8 +35,11 @@ class Trading {
       } else {
         this.sendEvent(event, data[2])
       }
-    } else if (['te', 'tu'].includes(event)) {
-      console.log('TRADE:', data[2])
+    } else if (['te'/*, 'tu'*/].includes(event)) {
+      const trade = this.formatTrade(data[2])
+
+      this.updateTrades(trade)
+      this.sendEvent('tu', trade)
     } else if (['os', 'on', 'ou', 'oc'].includes(event)) {
       console.log('ORDER:', data)
     }
@@ -63,6 +67,10 @@ class Trading {
     } else {
       this.wallets.push(data)
     }
+  }
+
+  updateTrades = data => {
+    this.trades.unshift(data)
   }
 
   /**
@@ -365,6 +373,31 @@ class Trading {
     })
 
     return trade
+  }
+
+  getRestConfig = (route, params) => {
+    const paths = {
+      trades: 'r/trades/tBTCUSD/hist',
+      newOrder: 'w/order/submit'
+    }
+    const path = paths[route]
+
+    if (typeof path !== 'undefined' & typeof params !== 'undefined') {
+      const apiKey = process.env.API_PUBLIC
+      const apiSecret = process.env.API_SECRET
+      const apiPath = `v2/auth/${path}`
+      const nonce = (Date.now() * 1000).toString()
+      const signature = `/api/${apiPath}${nonce}${JSON.stringify(params)}`
+      const sig = crypto.HmacSHA384(signature, apiSecret).toString() 
+      const url = `https://api.bitfinex.com/${apiPath}`
+      const headers = {
+        'bfx-nonce': nonce,
+        'bfx-apikey': apiKey,
+        'bfx-signature': sig
+      }
+  
+      return { url, headers }
+    }
   }
 }
 

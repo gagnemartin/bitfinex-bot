@@ -314,6 +314,13 @@ class Candle {
 
         this.mergeIndicators()
         this.candles[this.candles.length -1].position = TradingController.calculatePosition(candle)
+        
+        const candleUpdate = this.candles[this.candles.length -1]
+
+        // New Order BUY or SELL!!!
+        if (candleUpdate.position !== null) {
+          TradingController.newOrder(this.candles[this.candles.length -1])
+        }
 
         WebSocketClients.sendAll({
           data: this.candles[this.candles.length - 1],

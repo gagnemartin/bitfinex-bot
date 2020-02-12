@@ -62,6 +62,12 @@ class App extends PureComponent {
               wallets: [ ...prevState.wallets, [response.data] ]
             }))
           }
+        } else if (event === 'te') {
+          const trade = response.data
+
+          this.setState(prevState => ({
+            trades: [ ...prevState.trades.splice(0, prevState.trades.length - 1), trade ]
+          }))
         }
       })
     })
@@ -165,7 +171,7 @@ class App extends PureComponent {
           <div>
             <h2>WALLETS</h2>
             { wallets.map(wallet => (
-              <p key={`wallet-${wallet.currency}`}>{wallet.currency}: {wallet.balance}</p>
+              <p key={`wallet-${wallet.currency}`}>{wallet.currency}: {wallet.balance_available}</p>
             ))}
           </div>
         </div>
