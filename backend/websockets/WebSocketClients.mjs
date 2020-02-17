@@ -1,4 +1,4 @@
-import CandleController from '../controllers/CandleController.mjs'
+import CandleController from '../controllers/CandleController.js'
 const clients = []
 
 class WebSocketClients {

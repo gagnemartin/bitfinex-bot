@@ -1,5 +1,5 @@
 import indicators from 'technicalindicators'
-import TradingController from '../controllers/TradingController.mjs'
+import TradingController from '../controllers/TradingController.js'
 import WebSocketClients from '../websockets/WebSocketClients.mjs'
 
 class Candle {

@@ -1,7 +1,6 @@
 import axios from 'axios'
-import Candle from '../models/Candle.mjs'
-import AppController from './AppController.mjs'
-import SocketExchangeController from './SocketExchangeController.mjs'
+import { AppController, SocketExchangeController } from './index.js'
+import { Candle } from '../models/index.js'
 
 // TODO:
 //  Send balance and wallet snapshots only when the client connects

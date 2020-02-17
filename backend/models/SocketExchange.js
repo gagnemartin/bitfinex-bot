@@ -1,6 +1,6 @@
 import crypto from 'crypto-js'
-import TradingController from '../controllers/TradingController.mjs'
-import CandleController from '../controllers/CandleController.mjs'
+import TradingController from '../controllers/TradingController.js'
+import CandleController from '../controllers/CandleController.js'
 
 class SocketExchange {
   constructor() {

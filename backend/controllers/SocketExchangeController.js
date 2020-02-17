@@ -1,6 +1,6 @@
 import WebSocket from 'ws'
-import AppController from './AppController.mjs'
-import SocketExchange from '../models/SocketExchange.mjs'
+import { AppController } from './index.js'
+import { SocketExchange } from '../models/index.js'
 
 class SocketExchangeController extends AppController {
   constructor(model) {

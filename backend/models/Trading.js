@@ -70,7 +70,7 @@ class Trading {
   }
 
   updateTrades = data => {
-    this.trades.unshift(data)
+    this.trades.push(data)
   }
 
   /**

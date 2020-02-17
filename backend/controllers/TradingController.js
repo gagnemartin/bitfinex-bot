@@ -1,7 +1,7 @@
 import axios from 'axios'
-import AppController from './AppController.mjs'
-import SocketExchangeController from './SocketExchangeController.mjs'
-import Trading from '../models/Trading.mjs'
+import { AppController, SocketExchangeController } from './index.js'
+// import { Trading } from '../models/index.js'
+import Trading from '../models/Trading.js'
 
 class TradingController extends AppController {
   constructor(model) {
@@ -85,7 +85,7 @@ class TradingController extends AppController {
     
     if (['buy', 'sell'].includes(data.position) && typeof walletNeeded !== 'undefined') {
       const price = data.close.toString()
-      const amount = (isSell ? -walletBTC.balance_available : walletUSD.balance_available / data.close).toString()
+      const amount = (isSell ? -walletBTC.balance_available : walletUSD.balance_available / data.close).toFixed(4)
 
       if (amount !== 0) {
         const params = {

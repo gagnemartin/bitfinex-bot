@@ -1,5 +1,5 @@
 import express from 'express'
-import CandleController from '../controllers/CandleController.mjs'
+import { CandleController } from '../controllers/index.js'
 
 const routesCandles = express.Router()
 

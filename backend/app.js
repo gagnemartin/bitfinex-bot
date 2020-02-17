@@ -2,7 +2,7 @@ import express from 'express'
 import cookieParser from 'cookie-parser'
 import logger from 'morgan'
 import cors from 'cors'
-import indexRouter from './routes/index.mjs'
+import indexRouter from './routes/index.js'
 import WebSocket from 'ws'
 import WebSocketClients from './websockets/WebSocketClients.mjs'
 

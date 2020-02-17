@@ -1,5 +1,5 @@
 import express from 'express'
-import routesCandles from './candles.mjs'
+import routesCandles from './candles.js'
 
 const indexRouter = express.Router();
 
