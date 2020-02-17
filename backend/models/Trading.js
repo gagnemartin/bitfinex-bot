@@ -249,12 +249,13 @@ class Trading {
    * @return {Boolean} Has gained enough or not
    */
   hasGainedEnough = (data, isTrendingUp) => {
+    const lastTrade = this.trades[this.trades.length - 1]
     const percentage = this.percentageIncrease(data)
     const percentageThreshold = isTrendingUp ? -1 : -3
     const hoursBetweenThreshold = isTrendingUp ? 3 : 0.3
     const increaseThreshold = isTrendingUp ? 0.005 : 0.05
 
-    if (percentage <= percentageThreshold && this.hoursBetween(this.lastTrade.date, data.date) >= hoursBetweenThreshold) {
+    if (percentage <= percentageThreshold && this.hoursBetween(lastTrade.date, data.date) >= hoursBetweenThreshold) {
       this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
       return true
     }
