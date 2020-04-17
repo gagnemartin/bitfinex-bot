@@ -1,0 +1,9 @@
+{
+  "name": "bitfinex-bot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "init": "cd frontend && npm i && cd ../backend && npm i"
+  }
+}

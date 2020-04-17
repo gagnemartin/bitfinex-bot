@@ -1,5 +1,5 @@
 import crypto from 'crypto-js'
-import WebSocketClients from '../websockets/WebSocketClients.mjs'
+import WebSocketClients from '../websockets/WebSocketClients.js'
 
 class Trading {
   constructor() {
@@ -12,11 +12,11 @@ class Trading {
 
   /**
    * Handle a Websocket message event
-   * 
+   *
    * @param {Array|Object} data Message event from WebSocket
    */
   handleEvent = data => {
-    const event = data [1]
+    const event = data[1]
 
     if (['bu', 'bs', 'wu', 'ws'].includes(event)) {
       // Balance and Wallets snapshots
@@ -35,7 +35,7 @@ class Trading {
       } else {
         this.sendEvent(event, data[2])
       }
-    } else if (['te'/*, 'tu'*/].includes(event)) {
+    } else if (['te' /*, 'tu'*/].includes(event)) {
       const trade = this.formatTrade(data[2])
 
       this.updateTrades(trade)
@@ -47,7 +47,7 @@ class Trading {
 
   /**
    * Update the balance object
-   * 
+   *
    * @param {Object} data Balance object
    */
   updateBalance = data => {
@@ -56,11 +56,13 @@ class Trading {
 
   /**
    * Update the wallets array from a wallet object
-   * 
+   *
    * @param {Object} data Wallet object
    */
   updateWallets = data => {
-    const index = this.wallets.findIndex(wallet => wallet.currency === data.currency)
+    const index = this.wallets.findIndex(
+      wallet => wallet.currency === data.currency
+    )
 
     if (index >= 0) {
       this.wallets[index] = data
@@ -75,7 +77,7 @@ class Trading {
 
   /**
    * Format the balance data from an array to an object
-   * 
+   *
    * @param {Array} data Balance array from WebSocket
    * @return {Object} Object of the balance
    */
@@ -88,14 +90,22 @@ class Trading {
 
   /**
    * Format the wallet data from an array to an object
-   * 
+   *
    * @param {Array} data Wallet array from WebSocket
    * @return {Object} Object of the Wallet
    */
   formatWalletData = data => {
     const newData = {}
-    const keys = ['wallet_type', 'currency', 'balance', 'unsettled_interest', 'balance_available', 'description', 'meta']
-          
+    const keys = [
+      'wallet_type',
+      'currency',
+      'balance',
+      'unsettled_interest',
+      'balance_available',
+      'description',
+      'meta'
+    ]
+
     keys.forEach((key, i) => {
       newData[key] = data[i]
     })
@@ -105,7 +115,7 @@ class Trading {
 
   /**
    * Send an event for the Client via WebSocket
-   * 
+   *
    * @param {String} event Name of the event
    * @param {Array} eventData Array data from the Exchange WebSocket
    */
@@ -122,13 +132,13 @@ class Trading {
       data.data = this.formatWalletData(eventData)
       this.updateWallets(data.data)
     }
-    
+
     WebSocketClients.sendAll(data)
   }
 
   /**
    * Calculate the position of a candle
-   * 
+   *
    * @param {Object} data Candle from the Candle model
    */
   calculatePosition = data => {
@@ -136,14 +146,12 @@ class Trading {
 
     if (this.hasEnoughData(candle)) {
       if (this.shouldBuy(candle)) {
-
         console.log('\x1b[32m', '************** BUY **************')
         console.log('Price: ', candle.close)
         console.log(' ')
 
         return 'buy'
       } else if (this.shouldSell(candle)) {
-
         console.log('\x1b[33m', '************** SELL **************')
         console.log('Price: ', candle.close)
         console.log(' ')
@@ -159,13 +167,14 @@ class Trading {
 
   /**
    * If a candle has enough data to calculate a position
-   * 
+   *
    * @param {Object} data Candle from the Candle model
    * @return {Boolean} Has enough data or not
    */
   hasEnoughData = data => {
-    return (data.macd !== null &&
-      typeof data.macd.histogram !== 'undefined') &&
+    return (
+      data.macd !== null &&
+      typeof data.macd.histogram !== 'undefined' &&
       data.rsi !== null &&
       data.bearish !== null &&
       data.bullish !== null &&
@@ -173,11 +182,12 @@ class Trading {
       data.resistance_long !== null &&
       data.support_short !== null &&
       data.support_long !== null
+    )
   }
 
   /**
    * If a BUY order should be placed
-   * 
+   *
    * @param {Object} data Candle from the Candle model
    * @return {Boolean} Should buy or not
    */
@@ -205,7 +215,7 @@ class Trading {
 
   /**
    * If a SELL order should be placed
-   * 
+   *
    * @param {Object} data Candle from the Candle model
    * @return {Boolean} Should sell or not
    */
@@ -215,9 +225,9 @@ class Trading {
     // Can't sell 2 times in a row
     if (Math.sign(lastTrade.exec_amount) === 1) {
       // If trending up (gain long > loss long)
-        // HODL till long loss
+      // HODL till long loss
       // Else (trending down -> gain long < loss long)
-        // Sell on short gain
+      // Sell on short gain
       const isTrendingUp = this.isTrendingUp(data)
       const hasGainedEnough = this.hasGainedEnough(data, isTrendingUp)
 
@@ -238,7 +248,9 @@ class Trading {
   isTrendingUp = data => {
     const lastTrade = this.trades[this.trades.length - 1]
 
-    return (data.gain_short > data.loss_short) && data.close > lastTrade.exec_price
+    return (
+      data.gain_short > data.loss_short && data.close > lastTrade.exec_price
+    )
   }
 
   /**
@@ -255,7 +267,10 @@ class Trading {
     const hoursBetweenThreshold = isTrendingUp ? 3 : 0.3
     const increaseThreshold = isTrendingUp ? 0.005 : 0.05
 
-    if (percentage <= percentageThreshold && this.hoursBetween(lastTrade.date, data.date) >= hoursBetweenThreshold) {
+    if (
+      percentage <= percentageThreshold &&
+      this.hoursBetween(lastTrade.date, data.date) >= hoursBetweenThreshold
+    ) {
       this.thresholdIncrease = this.resetThreshold('thresholdIncrease')
       return true
     }
@@ -285,7 +300,11 @@ class Trading {
     const hoursBetweenThreshold = isTrendingUp ? 0.3 : 5
     const decreaseThreshold = isTrendingUp ? 0.3 : 0.05
 
-    if (percentage <= percentageThreshold && this.hoursBetween(lastTrade.mts_create, data.date) >= hoursBetweenThreshold) {
+    if (
+      percentage <= percentageThreshold &&
+      this.hoursBetween(lastTrade.mts_create, data.date) >=
+        hoursBetweenThreshold
+    ) {
       this.thresholdDecrease = this.resetThreshold('thresholdDecrease')
       return true
     }
@@ -303,18 +322,18 @@ class Trading {
 
   /**
    * Calculate the hours between 2 dates
-   * 
+   *
    * @param {Date} d1 Date
    * @param {Date} d2 Date
    * @return {Number} Number of hours
    */
   hoursBetween = (d1, d2) => {
-    return ((((Date.parse(d2) - Date.parse(d1)) / 1000) / 60) / 60)
+    return (Date.parse(d2) - Date.parse(d1)) / 1000 / 60 / 60
   }
 
   /**
    * Calculate the percentage increase from the last trade
-   * 
+   *
    * @param {Object} data Candle from the Candle model
    * @return {Number} Float of a percentage
    */
@@ -325,7 +344,7 @@ class Trading {
 
   /**
    * Calculate the percentage decrease from the last trade
-   * 
+   *
    * @param {Object} data Candle from the Candle model
    * @return {Number} Float of a percentage
    */
@@ -336,7 +355,7 @@ class Trading {
 
   /**
    * Reset the threshold for a given key
-   * 
+   *
    * @param {'thresholdIncrease'|'thresholdDecrease'} key Threshold key
    * @return {Number} Float of the default threshold
    */
@@ -361,8 +380,17 @@ class Trading {
   formatTrade = data => {
     const trade = {}
     const keys = [
-      'id', 'pair', 'mts_create', 'order_id', 'exec_amount', 'exec_price', 
-      'order_type', 'order_price', 'maker', 'fee', 'fee_currency'
+      'id',
+      'pair',
+      'mts_create',
+      'order_id',
+      'exec_amount',
+      'exec_price',
+      'order_type',
+      'order_price',
+      'maker',
+      'fee',
+      'fee_currency'
     ]
 
     data.forEach((element, i) => {
@@ -383,20 +411,28 @@ class Trading {
     }
     const path = paths[route]
 
-    if (typeof path !== 'undefined' & typeof params !== 'undefined') {
+    if ((typeof path !== 'undefined') & (typeof params !== 'undefined')) {
       const apiKey = process.env.API_PUBLIC
-      const apiSecret = process.env.API_SECRET
+      const apiSecret = process.env.API_SECRET || ''
       const apiPath = `v2/auth/${path}`
       const nonce = (Date.now() * 1000).toString()
       const signature = `/api/${apiPath}${nonce}${JSON.stringify(params)}`
-      const sig = crypto.HmacSHA384(signature, apiSecret).toString() 
-      const url = `https://api.bitfinex.com/${apiPath}`
-      const headers = {
-        'bfx-nonce': nonce,
-        'bfx-apikey': apiKey,
-        'bfx-signature': sig
+      const sigObject = crypto.HmacSHA384(signature, apiSecret)
+      let url = null
+      let headers = null
+
+      if (sigObject) {
+        const sig = sigObject.toString()
+        url = `https://api.bitfinex.com/${apiPath}`
+        headers = {
+          'bfx-nonce': nonce,
+          'bfx-apikey': apiKey,
+          'bfx-signature': sig
+        }
+
+        return { url, headers }
       }
-  
+
       return { url, headers }
     }
   }

@@ -1,6 +1,6 @@
 import indicators from 'technicalindicators'
 import TradingController from '../controllers/TradingController.js'
-import WebSocketClients from '../websockets/WebSocketClients.mjs'
+import WebSocketClients from '../websockets/WebSocketClients.js'
 
 class Candle {
   constructor() {
@@ -97,17 +97,16 @@ class Candle {
           open: trends.map(trend => trend.open),
           close: trends.map(trend => trend.close),
           high: trends.map(trend => trend.high),
-          low: trends.map(trend => trend.low),
+          low: trends.map(trend => trend.low)
         })
 
         candle.bearish = bearish({
           open: trends.map(trend => trend.open),
           close: trends.map(trend => trend.close),
           high: trends.map(trend => trend.high),
-          low: trends.map(trend => trend.low),
+          low: trends.map(trend => trend.low)
         })
       } else {
-
       }
     }
   }
@@ -243,7 +242,7 @@ class Candle {
 
   /**
    * Formats an array of well format candle objects
-   * 
+   *
    * @param {Array} candles Array of the candles
    * @returns {Array} Well formated array of objects
    */
@@ -253,7 +252,7 @@ class Candle {
 
   /**
    * Formats a well formated object of a candle
-   * 
+   *
    * @param {Array} candle Array of a single candle
    * @returns {Object} Well formated object of a candle
    */
@@ -313,13 +312,15 @@ class Candle {
         this.closes = this.candles.map(candle => candle.close)
 
         this.mergeIndicators()
-        this.candles[this.candles.length -1].position = TradingController.calculatePosition(candle)
-        
-        const candleUpdate = this.candles[this.candles.length -1]
+        this.candles[
+          this.candles.length - 1
+        ].position = TradingController.calculatePosition(candle)
+
+        const candleUpdate = this.candles[this.candles.length - 1]
 
         // New Order BUY or SELL!!!
         if (candleUpdate.position !== null) {
-          TradingController.newOrder(this.candles[this.candles.length -1])
+          TradingController.newOrder(this.candles[this.candles.length - 1])
         }
 
         WebSocketClients.sendAll({
@@ -332,7 +333,7 @@ class Candle {
 
   /**
    * Format the initial response when ia new Client WebSock connects
-   * 
+   *
    * @return {Object} Event object to send to the Client
    */
   formatInit = () => {

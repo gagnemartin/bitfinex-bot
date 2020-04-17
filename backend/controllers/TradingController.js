@@ -12,7 +12,7 @@ class TradingController extends AppController {
 
   /**
    * Handle a Websocket message event
-   * 
+   *
    * @param {Array|Object} data message event from WebSocket
    */
   handleEvent = data => {
@@ -26,7 +26,7 @@ class TradingController extends AppController {
 
   /**
    * Calculate the position of a candle
-   * 
+   *
    * @param {Object} data Candle from the Candle model
    */
   calculatePosition = data => {
@@ -46,31 +46,31 @@ class TradingController extends AppController {
         this.model.setTrades(res.data)
       })
       .catch(e => {
-        console.error(e.response.data)
+        console.error(e)
       })
   }
 
   /**
    * Return the balance
-   * 
+   *
    * @return {Object} Balance object
    */
   getBalance = () => {
     return this.model.balance
   }
-  
+
   /**
    * Return the wallets
-   * 
+   *
    * @return {Array} Wallets array
    */
   getWallets = () => {
     return this.model.wallets
   }
-  
+
   /**
    * Return the trades
-   * 
+   *
    * @return {Array} Trades array
    */
   getTrades = () => {
@@ -82,23 +82,23 @@ class TradingController extends AppController {
     const walletBTC = this.model.wallets.find(wallet => wallet.currency === 'BTC')
     const walletUSD = this.model.wallets.find(wallet => wallet.currency === 'USD')
     const walletNeeded = isSell ? walletBTC : walletUSD
-    
+
     if (['buy', 'sell'].includes(data.position) && typeof walletNeeded !== 'undefined') {
       const price = data.close.toString()
-      const amount = (isSell ? -walletBTC.balance_available : walletUSD.balance_available / data.close).toFixed(4)
+      const amount = (isSell ? -walletBTC.balance_available : walletUSD.balance_available / data.close).toString()
 
       if (amount !== 0) {
         const params = {
           type: 'EXCHANGE MARKET',
           symbol: 'tBTCUSD',
-          price,
+          // price,
           amount
           // flags: 0, // optional param to add flags
           // meta: {aff_code: "AFF_CODE_HERE"} // optional param to pass an affiliate code
         }
         const { url, headers } = this.model.getRestConfig('newOrder', params)
         const config = { headers }
-  
+
         axios.post(url, params, config)
         .then(res => {
           console.log(res.data)
