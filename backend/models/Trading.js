@@ -148,12 +148,14 @@ class Trading {
       if (this.shouldBuy(candle)) {
         console.log('\x1b[32m', '************** BUY **************')
         console.log('Price: ', candle.close)
+        console.log(Date(Date.now()).toString())
         console.log(' ')
 
         return 'buy'
       } else if (this.shouldSell(candle)) {
         console.log('\x1b[33m', '************** SELL **************')
         console.log('Price: ', candle.close)
+        console.log(Date(Date.now()).toString())
         console.log(' ')
 
         return 'sell'

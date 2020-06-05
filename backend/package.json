@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node ./bin/www",
-    "start:dev": "nodemon ./bin/www",
+    "start": "node ./bin/www.js",
+    "start:dev": "nodemon ./bin/www.js",
     "test": "jest --coverage"
   },
   "dependencies": {

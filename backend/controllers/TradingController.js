@@ -82,10 +82,13 @@ class TradingController extends AppController {
     const walletBTC = this.model.wallets.find(wallet => wallet.currency === 'BTC')
     const walletUSD = this.model.wallets.find(wallet => wallet.currency === 'USD')
     const walletNeeded = isSell ? walletBTC : walletUSD
+    const walletUSDAmount = walletUSD.balance_available / data.close
+    const feeAmount = 0.1
+    const fees = isSell ? walletBTC.balance_available * feeAmount : walletUSDAmount * feeAmount
 
     if (['buy', 'sell'].includes(data.position) && typeof walletNeeded !== 'undefined') {
       const price = data.close.toString()
-      const amount = (isSell ? -walletBTC.balance_available : walletUSD.balance_available / data.close).toString()
+      const amount = (isSell ? -walletBTC.balance_available + fees : walletUSDAmount - fees).toString()
 
       if (amount !== 0) {
         const params = {
